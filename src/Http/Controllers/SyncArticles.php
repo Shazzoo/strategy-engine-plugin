@@ -261,8 +261,11 @@ class SyncArticles
                 Log::warning('[StrategyEngine] Invalid featured image URL: '.$featured_image_url);
                 $featured_image_url = null; // Set to null if invalid
             }
-            if ($featured_image_url) {
-                $uploaded_image = Storage::disk('public')->put($upload_path, file_get_contents($featured_image_url));
+            // Het pad komt uit de bestandsnaam van de bron-URL, dus een
+            // bestaand bestand betekent dat deze afbeelding er al staat. Een
+            // vervangen afbeelding krijgt een andere naam en wordt wel gehaald.
+            if ($featured_image_url && Storage::disk('public')->missing($upload_path)) {
+                Storage::disk('public')->put($upload_path, file_get_contents($featured_image_url));
             }
 
             $article = ContentStudioArticle::updateOrCreate(
@@ -331,6 +334,28 @@ class SyncArticles
             return $imageUrl;
         }
 
+        $directory = preg_replace('/[^A-Za-z0-9_-]/', '-', (string) ($contentId ?: 'unknown'));
+        // De bron-URL zit in de bestandsnaam, zodat een vervangen afbeelding op
+        // dezelfde placeholder een nieuw pad krijgt en de controle hieronder de
+        // oude versie niet laat staan.
+        $urlHash = substr(sha1($imageUrl), 0, 12);
+        $filename = $placeholderId
+            ? preg_replace('/[^A-Za-z0-9_-]/', '-', $placeholderId).'-'.$urlHash
+            : $urlHash;
+        $folder = preg_replace('/[^a-z0-9-]/', '', strtolower($type)) ?: 'image';
+        $extension = $this->extensionFromUrl($imageUrl);
+
+        // Staat het bestand er al, dan hoeft een volgende sync het niet opnieuw
+        // op te halen. Zonder bruikbare extensie in de URL is het Content-Type
+        // uit de response nodig en valt er nog niets te controleren.
+        if ($extension !== null) {
+            $path = "content_studio_images/{$directory}/{$folder}s/{$filename}.{$extension}";
+
+            if (Storage::disk('public')->exists($path)) {
+                return $this->publicStorageUrl($path);
+            }
+        }
+
         try {
             $response = Http::timeout(20)->get($imageUrl);
         } catch (\Throwable $e) {
@@ -351,10 +376,7 @@ class SyncArticles
             return $imageUrl;
         }
 
-        $directory = preg_replace('/[^A-Za-z0-9_-]/', '-', (string) ($contentId ?: 'unknown'));
-        $filename = preg_replace('/[^A-Za-z0-9_-]/', '-', (string) ($placeholderId ?: sha1($imageUrl)));
-        $extension = $this->imageExtension($imageUrl, $response->header('Content-Type'));
-        $folder = preg_replace('/[^a-z0-9-]/', '', strtolower($type)) ?: 'image';
+        $extension ??= $this->extensionFromContentType($response->header('Content-Type'));
         $path = "content_studio_images/{$directory}/{$folder}s/{$filename}.{$extension}";
 
         Storage::disk('public')->put($path, $response->body());
@@ -367,7 +389,7 @@ class SyncArticles
         return preg_replace('#(?<!:)//+#', '/', Storage::disk('public')->url($path)) ?? Storage::disk('public')->url($path);
     }
 
-    private function imageExtension(string $imageUrl, ?string $contentType): string
+    private function extensionFromUrl(string $imageUrl): ?string
     {
         $extension = strtolower((string) pathinfo((string) parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION));
 
@@ -375,6 +397,11 @@ class SyncArticles
             return $extension === 'jpeg' ? 'jpg' : $extension;
         }
 
+        return null;
+    }
+
+    private function extensionFromContentType(?string $contentType): string
+    {
         $contentType = strtolower((string) $contentType);
 
         if (str_contains($contentType, 'image/jpeg')) {
