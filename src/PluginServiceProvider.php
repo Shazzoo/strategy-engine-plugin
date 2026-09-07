@@ -94,7 +94,7 @@ class PluginServiceProvider extends ServiceProvider
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $schedule->command('content-studio:articles')
-                ->daily()
+                ->everyFifteenMinutes()
                 ->withoutOverlapping(); // alleen nuttig als je meerdere servers hebt
         });
 
