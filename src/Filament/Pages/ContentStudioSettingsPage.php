@@ -23,7 +23,7 @@ class ContentStudioSettingsPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
 
-    protected static ?string $navigationLabel = 'Strategy Engine Settings';
+    protected static ?string $navigationLabel = 'Strategy Engine';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Plugins';
 
