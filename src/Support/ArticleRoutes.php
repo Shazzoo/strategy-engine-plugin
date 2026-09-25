@@ -9,7 +9,7 @@ final class ArticleRoutes
     public static function indexPath(?string $locale = null, ?string $prefix = null): string
     {
         $segments = array_filter([
-            self::usesLocalizedRoutes() ? self::normalizeSegment($locale) : null,
+            self::usesLocalizedRoutes() && ! self::isHiddenDefaultLocale($locale) ? self::normalizeSegment($locale) : null,
             self::prefix($prefix),
         ]);
 
@@ -34,6 +34,18 @@ final class ArticleRoutes
     public static function usesLocalizedRoutes(): bool
     {
         return function_exists('cms_is_multilang') && cms_is_multilang();
+    }
+
+    /**
+     * Core kan de standaardtaal zonder taalcode in de URL laten staan; dan
+     * krijgen de artikelen in die taal ook geen taalcode.
+     */
+    private static function isHiddenDefaultLocale(?string $locale): bool
+    {
+        $runtime = function_exists('cms_runtime') ? cms_runtime() : [];
+
+        return (bool) ($runtime['hide_default_locale'] ?? false)
+            && ($locale ?? app()->getLocale()) === ($runtime['default_lang'] ?? null);
     }
 
     public static function prefix(?string $prefix = null): string
