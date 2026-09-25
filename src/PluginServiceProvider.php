@@ -61,6 +61,11 @@ class PluginServiceProvider extends ServiceProvider
         // views
         $this->loadViewsFrom($base.'/resources/views', 'strategy-engine');
 
+        // Core looks up a plugin's block views under the last part of its key
+        // (shazzoo/strategy-engine-plugin), not under its slug. Without this,
+        // themes that find block views by type never see the article block.
+        $this->loadViewsFrom($base.'/resources/views', 'strategy-engine-plugin');
+
         // TRANSLATIONS.
         $this->loadTranslationsFrom($base.'/resources/lang', 'strategy-engine');
 
