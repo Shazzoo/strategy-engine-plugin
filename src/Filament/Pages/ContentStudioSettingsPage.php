@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Artisan;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
 use Shazzoo\StrategyEngine\Support\Engine\ProjectInfo;
 use Shazzoo\ContentStudioCore\Support\Blocks\Adapters\FilamentFieldAdapter;
+use Shazzoo\ContentStudioCore\Support\Blocks\Components\Component;
 use Shazzoo\ContentStudioCore\Support\Templates\TemplateSettingsDefinition;
 use Shazzoo\ContentStudioCore\Support\Theming\TemplateDefinitionRegistry;
 use Shazzoo\ContentStudioCore\Support\Theming\TemplateRegistry;
@@ -98,10 +99,12 @@ class ContentStudioSettingsPage extends Page
                         Group::make()
                             ->schema(fn (Get $get): array => $this->templateSettingsSchema($get, 'index_template_key'))
                             ->statePath('index_template_settings')
+                            ->columns(12)
                             ->columnSpan(1),
                         Group::make()
                             ->schema(fn (Get $get): array => $this->templateSettingsSchema($get, 'article_template_key'))
                             ->statePath('article_template_settings')
+                            ->columns(12)
                             ->columnSpan(1),
                     ]),
             ])
@@ -141,7 +144,14 @@ class ContentStudioSettingsPage extends Page
             return [];
         }
 
-        return app(FilamentFieldAdapter::class)->convertSchema($definition->schema ?? []);
+        // Template fields are laid out on a 12-column grid, like blocks. A
+        // field without a width gets the whole row instead of one column.
+        $fields = array_map(
+            fn (Component $field): Component => $field->columnSpan === null ? $field->columnSpan(12) : $field,
+            $definition->schema ?? [],
+        );
+
+        return app(FilamentFieldAdapter::class)->convertSchema($fields);
     }
 
     public function save(): void
