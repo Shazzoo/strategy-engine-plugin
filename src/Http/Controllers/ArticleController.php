@@ -20,7 +20,7 @@ class ArticleController
         app()->setLocale($resolvedLocale);
 
         $setting = ContentStudioSetting::singleton();
-        $prefix = trim((string) ($setting->route_prefix ?: 'blog'), '/');
+        $prefix = ArticleRoutes::prefix(trim((string) ($setting->route_prefix ?: 'blog'), '/'), $resolvedLocale);
         $perPage = max(1, min(48, (int) ($setting->articles_per_page ?: 12)));
 
         $active = app(ThemeManager::class)->active();
@@ -47,7 +47,7 @@ class ArticleController
         $prefix = $context['prefix'];
 
         $segments = explode('/', trim((string) $slug, '/'));
-        if (($segments[0] ?? null) === $prefix) {
+        if (($segments[0] ?? null) === $prefix || in_array($segments[0] ?? null, ArticleRoutes::prefixes(), true)) {
             array_shift($segments);
         }
 

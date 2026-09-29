@@ -10,7 +10,7 @@ final class ArticleRoutes
     {
         $segments = array_filter([
             self::usesLocalizedRoutes() && ! self::isHiddenDefaultLocale($locale) ? self::normalizeSegment($locale) : null,
-            self::prefix($prefix),
+            self::prefix($prefix, $locale ?? app()->getLocale()),
         ]);
 
         return '/'.implode('/', $segments);
@@ -48,11 +48,44 @@ final class ArticleRoutes
             && ($locale ?? app()->getLocale()) === ($runtime['default_lang'] ?? null);
     }
 
-    public static function prefix(?string $prefix = null): string
+    /**
+     * Het voorvoegsel van de artikelen. Een taal met een eigen voorvoegsel in
+     * content-studio.route_prefixes (bijvoorbeeld 'en' => 'knowledge-base')
+     * krijgt dat; anders het voorvoegsel uit de instellingen.
+     */
+    public static function prefix(?string $prefix = null, ?string $locale = null): string
     {
+        $localePrefix = $locale !== null ? self::localePrefixes()[$locale] ?? null : null;
+
+        if (filled($localePrefix)) {
+            return self::normalizeSegment($localePrefix);
+        }
+
         $prefix = $prefix ?? self::settingPrefix();
 
         return self::normalizeSegment($prefix) ?: 'blog';
+    }
+
+    /**
+     * Elk voorvoegsel waaronder artikelen kunnen staan: dat uit de
+     * instellingen en die per taal.
+     *
+     * @return array<int, string>
+     */
+    public static function prefixes(): array
+    {
+        return array_values(array_unique(array_filter([
+            self::prefix(),
+            ...array_map(self::normalizeSegment(...), self::localePrefixes()),
+        ])));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function localePrefixes(): array
+    {
+        return array_filter((array) config('content-studio.route_prefixes', []), 'filled');
     }
 
     private static function settingPrefix(): string

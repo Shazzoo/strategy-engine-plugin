@@ -11,6 +11,7 @@ use Shazzoo\StrategyEngine\Console\Commands\ContentStudioArticleSync;
 use Shazzoo\StrategyEngine\Http\Controllers\ArticleController;
 use Shazzoo\StrategyEngine\Http\Controllers\TrackingScriptController;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
+use Shazzoo\StrategyEngine\Support\ArticleRoutes;
 use Shazzoo\StrategyEngine\Sitemap\SitemapGenerator;
 use Shazzoo\StrategyEngine\Views\Components\Blocks\ContentStudioArticles;
 use Shazzoo\ContentStudioCore\Support\Blocks\BlockDefinitionNamespaceRegistry;
@@ -40,6 +41,13 @@ class PluginServiceProvider extends ServiceProvider
 
         $pluginRouteRegistry->register($routePrefix, ArticleController::class);
 
+        // Talen met een eigen voorvoegsel (content-studio.route_prefixes).
+        $localePrefixes = array_diff(ArticleRoutes::localePrefixes(), [$routePrefix]);
+
+        foreach (array_unique($localePrefixes) as $localePrefix) {
+            $pluginRouteRegistry->register($localePrefix, ArticleController::class);
+        }
+
         Route::middleware('web')
             // Let op: het pad moet onder een prefix vallen die de catch-all
             // frontend-route van content-studio-core uitsluit ("js/"), anders
@@ -47,11 +55,15 @@ class PluginServiceProvider extends ServiceProvider
             ->get('/js/strategy-engine/tracking.js', TrackingScriptController::class)
             ->name('content-studio.tracking-script');
 
-        Route::middleware('web')->group(function () use ($routePrefix) {
+        Route::middleware('web')->group(function () use ($routePrefix, $localePrefixes) {
             $this->registerArticleRoutes($routePrefix, 'blog');
 
             if ($routePrefix !== 'blog') {
                 $this->registerArticleRoutes('blog', 'blog.alias');
+            }
+
+            foreach ($localePrefixes as $locale => $localePrefix) {
+                $this->registerLocaleArticleRoutes($locale, trim($localePrefix, '/'));
             }
         });
 
@@ -116,6 +128,24 @@ class PluginServiceProvider extends ServiceProvider
         app(BlockDefinitionNamespaceRegistry::class)->addMany([
             'Shazzoo\\StrategyEngine\\Forms\\Blocks',
         ]);
+    }
+
+    /**
+     * Routes onder het eigen voorvoegsel van één taal, alleen voor die taal:
+     * /en/knowledge-base/{slug} en niet /nl/knowledge-base/{slug}.
+     */
+    private function registerLocaleArticleRoutes(string $locale, string $routePrefix): void
+    {
+        if (! function_exists('cms_is_multilang') || ! cms_is_multilang()) {
+            return;
+        }
+
+        Route::get('/{locale}/'.$routePrefix, [ArticleController::class, 'index'])
+            ->where('locale', preg_quote($locale, '/'))
+            ->name('locale.blog.'.$locale.'.index');
+        Route::get('/{locale}/'.$routePrefix.'/{slug}', [ArticleController::class, 'show'])
+            ->where('locale', preg_quote($locale, '/'))
+            ->name('locale.blog.'.$locale.'.show');
     }
 
     private function registerArticleRoutes(string $routePrefix, string $namePrefix): void
