@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Shazzoo\StrategyEngine\Console\Commands\ContentStudioArticleSync;
 use Shazzoo\StrategyEngine\Http\Controllers\ArticleController;
+use Shazzoo\StrategyEngine\Http\Controllers\EngineWebhookController;
 use Shazzoo\StrategyEngine\Http\Controllers\TrackingScriptController;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
@@ -47,6 +48,15 @@ class PluginServiceProvider extends ServiceProvider
         foreach (array_unique($localePrefixes) as $localePrefix) {
             $pluginRouteRegistry->register($localePrefix, ArticleController::class);
         }
+
+        /*
+         * Waar de engine aanklopt. Op de api-groep en niet op web: dit is
+         * een machine met een handtekening, geen browser met een sessie,
+         * en een CSRF-token heeft hij niet.
+         */
+        Route::middleware('api')
+            ->post('/content-studio/webhook', EngineWebhookController::class)
+            ->name('content-studio.webhook');
 
         Route::middleware('web')
             // Let op: het pad moet onder een prefix vallen die de catch-all
