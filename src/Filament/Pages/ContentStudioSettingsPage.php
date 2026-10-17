@@ -13,7 +13,9 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Artisan;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
+use Shazzoo\StrategyEngine\Support\Engine\EngineClient;
 use Shazzoo\StrategyEngine\Support\Engine\ProjectInfo;
+use Shazzoo\StrategyEngine\Support\Engine\SyncFromEngine;
 use Shazzoo\ContentStudioCore\Support\Blocks\Adapters\FilamentFieldAdapter;
 use Shazzoo\ContentStudioCore\Support\Blocks\Components\Component;
 use Shazzoo\ContentStudioCore\Support\Templates\TemplateSettingsDefinition;
@@ -158,11 +160,60 @@ class ContentStudioSettingsPage extends Page
     {
         $model = ContentStudioSetting::singleton();
         $model->fill($this->form->getState());
+
+        /* Wie hier een andere sleutel of een ander project invult, verbindt
+           met iets anders dan waar het bewaarde geheim bij hoort. */
+        $keysChanged = $model->isDirty(['cs_api_key', 'cs_project_code']);
+
         $model->save();
 
         Notification::make()
             ->title('Strategy Engine instellingen opgeslagen')
             ->success()
+            ->send();
+
+        $this->connectToEngine($keysChanged);
+    }
+
+    /**
+     * Verbinden hoort bij opslaan.
+     *
+     * Wie de sync key en de client id invult wil daarmee verbonden zijn, en
+     * de engine hoort bij die aanmelding zelf welk CMS dit is en op welk
+     * adres hij mag bellen. Er valt dus niets meer in te stellen - alleen te
+     * melden wat ervan kwam.
+     */
+    private function connectToEngine(bool $force = false): void
+    {
+        $engine = EngineClient::fromSettings();
+
+        if (! $engine->isConfigured()) {
+            return;
+        }
+
+        if ($engine->isConnected() && ! $force) {
+            return;
+        }
+
+        if ($engine->register(SyncFromEngine::make()->webhookUrl())) {
+            Notification::make()
+                ->title('Aangemeld bij Content Studio')
+                ->body('De engine stuurt nieuwe artikelen nu zelf naar deze website.')
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        /* Geen fout voor de site: dit blijft werken zoals het werkte, met de
+           dagelijkse ophaalronde. Alleen trager, en de reden van de engine
+           hoort de klant hier te lezen - een project dat al aan een andere
+           website hangt, moet die koppeling daar eerst verbreken. */
+        Notification::make()
+            ->title('Nog niet aangemeld bij Content Studio')
+            ->body($engine->lastMessage() ?: 'De engine was niet te bereiken. De artikelen komen voorlopig met de dagelijkse ophaalronde binnen.')
+            ->warning()
+            ->persistent()
             ->send();
     }
 
@@ -200,9 +251,12 @@ class ContentStudioSettingsPage extends Page
     private static function projectHelperText(): string
     {
         $info = ProjectInfo::stored();
+        $connection = EngineClient::fromSettings()->isConnected()
+            ? 'Aangemeld: de engine stuurt artikelen zelf hierheen.'
+            : 'Nog niet aangemeld: artikelen komen met de dagelijkse ophaalronde.';
 
         if (empty($info)) {
-            return 'De project code van Content Studio Engine. (Nog niet opgehaald - draai een sync.)';
+            return 'De project code van Content Studio Engine. (Nog niet opgehaald - draai een sync.) '.$connection;
         }
 
         $parts = array_filter([
@@ -220,6 +274,6 @@ class ContentStudioSettingsPage extends Page
             $summary .= ' | '.$info['content_counts']['total'].' artikelen beschikbaar';
         }
 
-        return $summary;
+        return $summary.' | '.$connection;
     }
 }
