@@ -148,7 +148,13 @@ class SyncArticles
                 continue;
             }
 
-            if ($this->processArticle($item)) {
+            $article = $this->processArticle($item);
+
+            if ($article) {
+                if (app()->environment('production')) {
+                    app(ConfirmPublished::class)($article);
+                }
+
                 $stats['synced']++;
             }
         }
@@ -183,7 +189,16 @@ class SyncArticles
         return in_array($status, self::SYNCABLE_STATUSES, true);
     }
 
-    private function processArticle($item)
+    /**
+     * Zet één artikel uit de engine om naar een rij hier. Publiek omdat de
+     * V2-weg (SyncFromEngine) exact dezelfde toewijzing nodig heeft als de
+     * oude ophaalronde - twee keer hetzelfde veldwerk is twee keer iets om
+     * te vergeten.
+     *
+     * Geeft het artikel terug, of null als het niet verwerkt kon worden;
+     * het bevestigen is aan de aanroeper, omdat V1 en V2 dat anders doen.
+     */
+    public function processArticle($item): ?ContentStudioArticle
     {
         DB::beginTransaction();
 
@@ -310,11 +325,7 @@ class SyncArticles
 
             DB::commit();
 
-            if (app()->environment('production')) {
-                app(ConfirmPublished::class)($article);
-            }
-
-            return true;
+            return $article;
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('[StrategyEngine] Fout bij verwerken artikel: '.$e->getLine().' ('.$e->getMessage().')', [
@@ -322,7 +333,7 @@ class SyncArticles
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return null;
         }
     }
 
