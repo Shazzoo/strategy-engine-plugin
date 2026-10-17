@@ -6,6 +6,8 @@ use Illuminate\Console\Command;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Shazzoo\StrategyEngine\Http\Controllers\SyncArticles;
+use Shazzoo\StrategyEngine\Support\Engine\EngineClient;
+use Shazzoo\StrategyEngine\Support\Engine\SyncFromEngine;
 
 class ContentStudioArticleSync extends Command
 {
@@ -13,8 +15,37 @@ class ContentStudioArticleSync extends Command
 
     protected $description = 'Sync content articles from the Content Studio API.';
 
+    /**
+     * Dezelfde opdracht, twee manieren van werken.
+     *
+     * Is deze site aangemeld bij de engine, dan wordt hij gebeld zodra er
+     * iets klaarstaat en is dit alleen nog het vangnet: ophalen wat een
+     * gemiste webhook heeft laten liggen, vanaf de eigen cursor. Zo niet,
+     * dan blijft het de oude ophaalronde.
+     *
+     * Nooit allebei: dat is precies de weg waarlangs hetzelfde artikel
+     * twee keer gepubliceerd zou worden.
+     */
     public function handle(SyncArticles $syncArticles): int
     {
+        $engine = EngineClient::fromSettings();
+
+        if ($engine->isConfigured() && ! $engine->isConnected()) {
+            /* Zelf aanmelden met de sleutels die hier al staan. Lukt het
+               niet - een engine die V2 nog niet kent, een adres dat van
+               buiten niet te bereiken is - dan valt deze site gewoon terug
+               op de oude weg. */
+            $engine->register(route('content-studio.webhook'));
+        }
+
+        if ($engine->isConnected()) {
+            $handled = SyncFromEngine::make()->catchUp();
+
+            $this->info("Bijgewerkt via de engine: {$handled} artikel(en).");
+
+            return self::SUCCESS;
+        }
+
         Log::info('[ContentStudioArticleSync] Starting article sync...');
         $this->info('Starting Content Studio sync...');
 
