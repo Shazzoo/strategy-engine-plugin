@@ -18,6 +18,8 @@ class ContentStudioSetting extends Model
         'meta',
         'cs_api_key',
         'cs_project_code',
+        'cs_webhook_secret',
+        'cs_sync_cursor',
         'route_prefix',
         'articles_per_block',
         'articles_per_page',
@@ -25,6 +27,16 @@ class ContentStudioSetting extends Model
         'index_template_settings',
         'article_template_key',
         'article_template_settings',
+    ];
+
+    /**
+     * Het geheim waarmee binnenkomende webhooks gecontroleerd worden hoort
+     * nooit in een toArray() terecht te komen: die array gaat als
+     * Livewire-state naar de browser zodra een instellingenformulier ermee
+     * gevuld wordt.
+     */
+    protected $hidden = [
+        'cs_webhook_secret',
     ];
 
     protected $casts = [

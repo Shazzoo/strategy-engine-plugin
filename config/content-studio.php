@@ -3,6 +3,13 @@
 return [
     'engine' => [
         'api_url' => env('CONTENT_STUDIO_ENGINE_API_URL', 'https://engine.content-studio.com/api/v1'),
+
+        /*
+         * V2: de engine belt de site zodra een artikel live mag, en de site
+         * haalt het hier op. Standaard hetzelfde adres als hierboven, met v2
+         * in plaats van v1.
+         */
+        'api_v2_url' => env('CONTENT_STUDIO_ENGINE_API_V2_URL', 'https://engine.content-studio.com/api/v2'),
     ],
 
     /*
