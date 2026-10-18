@@ -25,4 +25,10 @@ return [
     'revisions' => 'Revisies',
     'select_item_for_editor' => 'Selecteer eerst een item in de Items-tab, of maak een nieuw item met New item.',
     'select_item_for_revisions' => 'Selecteer eerst een item om revisies te bekijken.',
+    'about_the_author' => 'Over de auteur',
+    'article_facts' => 'Artikel',
+    'author' => 'Auteur',
+    'publication' => 'Publicatie',
+    'reading_time_label' => 'Leestijd',
+    'reading_time_minutes' => ':minutes min',
 ];

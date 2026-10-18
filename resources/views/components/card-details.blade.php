@@ -34,6 +34,45 @@
         {{-- Currently hardcoded for testing, is not yet in API response --}}
         {{-- <x-strategy-engine::article-tags /> --}}
 
+        {{-- Over de auteur. De Engine zet dit niet meer in de body van het
+             artikel, juist zodat een site het hier kan opmaken. Staat er niets
+             in de velden, dan blijft het blok weg. --}}
+        @php
+            $authorName = filled($article->author_name) ? $article->author_name : null;
+            $authorRole = collect([$article->author_role_title, $article->author_experience_label])
+                ->filter()
+                ->implode(' · ');
+            $authorIntro = collect([$article->author_experience_summary, $article->author_article_relevance])
+                ->filter(fn ($line) => filled($line))
+                ->values();
+        @endphp
+
+        @if ($authorName && ($authorIntro->isNotEmpty() || filled($article->author_boundary_note)))
+            <section class="mt-14 border-t border-line pt-8">
+                <p class="mb-4 text-xs font-bold uppercase tracking-[0.08em] text-ink-400">
+                    {{ __('strategy-engine::content_studio.about_the_author') }}
+                </p>
+
+                <h2 class="text-xl font-bold text-ink-950">{{ $authorName }}</h2>
+
+                @if (filled($authorRole))
+                    <p class="mt-1 text-sm text-ink-400">{{ $authorRole }}</p>
+                @endif
+
+                @foreach ($authorIntro as $paragraph)
+                    <p class="mt-4 text-ink-800">{{ $paragraph }}</p>
+                @endforeach
+
+                @if (filled($article->author_boundary_note))
+                    {{-- Waar de kennis van de auteur ophoudt: een kanttekening,
+                         geen alinea erbij. --}}
+                    <p class="mt-6 border-l-2 border-line pl-4 text-sm text-ink-400">
+                        {{ $article->author_boundary_note }}
+                    </p>
+                @endif
+            </section>
+        @endif
+
         <section class="mt-14 grid grid-cols-1 gap-8 border-t border-line pt-8 md:grid-cols-2">
             <div>
                 <p class="mb-4 text-xs font-bold uppercase tracking-[0.08em] text-ink-400">

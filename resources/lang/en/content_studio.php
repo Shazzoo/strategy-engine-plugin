@@ -25,4 +25,10 @@ return [
     'revisions' => 'Revisions',
     'select_item_for_editor' => 'Select an item in the Items tab first, or create a new item with New item.',
     'select_item_for_revisions' => 'Select an item first to view revisions.',
+    'about_the_author' => 'About the author',
+    'article_facts' => 'Article',
+    'author' => 'Author',
+    'publication' => 'Published',
+    'reading_time_label' => 'Reading time',
+    'reading_time_minutes' => ':minutes min',
 ];
