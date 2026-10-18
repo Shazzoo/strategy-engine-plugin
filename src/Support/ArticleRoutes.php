@@ -49,6 +49,19 @@ final class ArticleRoutes
     }
 
     /**
+     * De standaardtaal van de site, zoals Core hem kent. Die bepaalt welke
+     * url x-default krijgt.
+     */
+    public static function defaultLocale(): ?string
+    {
+        $runtime = function_exists('cms_runtime') ? cms_runtime() : [];
+
+        $default = $runtime['default_lang'] ?? null;
+
+        return filled($default) ? (string) $default : null;
+    }
+
+    /**
      * Het voorvoegsel van de artikelen. Een taal met een eigen voorvoegsel in
      * content-studio.route_prefixes (bijvoorbeeld 'en' => 'knowledge-base')
      * krijgt dat; anders het voorvoegsel uit de instellingen.

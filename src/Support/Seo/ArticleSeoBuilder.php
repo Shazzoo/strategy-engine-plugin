@@ -15,10 +15,17 @@ final class ArticleSeoBuilder
 
         $currentPage = request()->get('page', 1);
         $canonical = $this->articleIndexUrl($locale);
+        $alternates = $this->indexAlternates($locale);
 
         if ($currentPage > 1) {
             $title .= " - Pagina {$currentPage}";
             $canonical = $this->articleIndexUrl($locale, ['page' => $currentPage]);
+
+            /* Vanaf pagina 2 geen hreflang. Een andere taal heeft een andere
+               hoeveelheid artikelen, dus pagina 2 daar toont iets anders -
+               en bestaat soms niet eens. Naar de eerste pagina wijzen is net
+               zo fout: dat is niet dezelfde pagina. */
+            $alternates = [];
         }
 
         $description = 'Ontdek de laatste trends over Laravel, AI-oplossingen en softwareontwikkeling bij Shazzoo.';
@@ -44,7 +51,7 @@ final class ArticleSeoBuilder
             title: $title,
             description: $description,
             canonical: $canonical,
-            alternates: [],
+            alternates: $alternates,
             openGraph: [
                 'title' => $title,
                 'description' => $description,
@@ -94,8 +101,9 @@ final class ArticleSeoBuilder
         $follow = 'follow';
         $robots = "{$index},{$follow}";
 
-        // 5. Alternates (leeg laten omdat het niet meertalig is)
-        $alternates = [];
+        // 5. Alternates: de vertalingen van dit artikel, zodat een
+        //    anderstalige bezoeker bij zijn eigen versie uitkomt.
+        $alternates = $this->articleAlternates($article, $locale);
 
         $image_url = $article->featured_image_url ?? null;
         // MAKE ABSOLUTE URL IF NOT ALREADY. IT IS LOCATED IN PUBLIC STORAGE.
@@ -149,6 +157,81 @@ final class ArticleSeoBuilder
             ],
             robots: $robots,
         );
+    }
+
+    /**
+     * De vertalingen van dit artikel.
+     *
+     * De Engine zet vertalingen van hetzelfde artikel onder één cluster_key;
+     * dat is hier de enige betrouwbare band tussen twee talen, want de slugs
+     * verschillen per taal.
+     *
+     * @return array<int, array{locale: string, url: string}>
+     */
+    private function articleAlternates(ContentStudioArticle $article, ?string $locale): array
+    {
+        if (! ArticleRoutes::usesLocalizedRoutes()) {
+            /* Eentalige site: elke taal zou op dezelfde url uitkomen, en een
+               hreflang-set die naar zichzelf wijst zegt niets. */
+            return [];
+        }
+
+        $own = $locale ?: (string) $article->locale;
+
+        $candidates = [[
+            'locale' => $own,
+            'url' => $this->articleUrl((string) $article->slug, $own),
+        ]];
+
+        if (filled($article->cluster_key)) {
+            $translations = ContentStudioArticle::query()
+                ->where('cluster_key', $article->cluster_key)
+                ->whereKeyNot($article->getKey())
+                ->whereNotNull('locale')
+                ->where('locale', '!=', '')
+                ->whereNotNull('slug')
+                ->where('slug', '!=', '')
+                ->get(['locale', 'slug']);
+
+            foreach ($translations as $translation) {
+                $candidates[] = [
+                    'locale' => (string) $translation->locale,
+                    'url' => $this->articleUrl((string) $translation->slug, (string) $translation->locale),
+                ];
+            }
+        }
+
+        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale());
+    }
+
+    /**
+     * Voor de overzichtspagina: elke taal waarin hier artikelen staan.
+     *
+     * @return array<int, array{locale: string, url: string}>
+     */
+    private function indexAlternates(?string $locale): array
+    {
+        if (! ArticleRoutes::usesLocalizedRoutes()) {
+            return [];
+        }
+
+        $locales = ContentStudioArticle::query()
+            ->whereNotNull('locale')
+            ->where('locale', '!=', '')
+            ->distinct()
+            ->pluck('locale')
+            ->all();
+
+        /* De taal van de pagina zelf voorop, zodat x-default en de volgorde
+           hetzelfde uitpakken als bij een artikel. */
+        $ordered = array_values(array_unique(array_filter([$locale, ...$locales])));
+
+        $candidates = array_map(fn (string $loc): array => [
+            'locale' => $loc,
+            'url' => $this->articleIndexUrl($loc),
+        ], $ordered);
+
+        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale());
     }
 
     /**
