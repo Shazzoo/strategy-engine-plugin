@@ -261,7 +261,13 @@ class SyncArticles
             $author_name = $item['author_name'] ?? null;
             $author_role_title = $item['author_role_title'] ?? null;
             $author_experience_label = $item['author_experience_label'] ?? null;
-            $author_experience_summary = $item['author_experience_summary'] ?? null;
+            /* De Engine stuurt dit veld als author_expertise_summary. De oude
+               sleutel hierboven las een kolom die daar niet bestaat, dus kwam
+               er op elke site null binnen; de kolomnaam hier blijft zoals hij
+               is, want die staat al op elke site. */
+            $author_experience_summary = $item['author_expertise_summary']
+                ?? $item['author_experience_summary']
+                ?? null;
             $author_article_relevance = $item['author_article_relevance'] ?? null;
             $author_boundary_note = $item['author_boundary_note'] ?? null;
 
