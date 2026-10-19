@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
 use Shazzoo\StrategyEngine\Support\ArticleImagePlaceholders;
+use Shazzoo\StrategyEngine\Support\ArticleRoutes;
 use Shazzoo\StrategyEngine\Support\Engine\ConfirmPublished;
 use Shazzoo\StrategyEngine\Support\Engine\ProjectInfo;
 
@@ -200,6 +201,21 @@ class SyncArticles
      */
     public function processArticle($item): ?ContentStudioArticle
     {
+        /*
+         * De Engine schrijft in de talen van het project; deze site toont
+         * er soms minder. Zo'n artikel hier opslaan levert een pagina op in
+         * een taal die de site niet voert, compleet met hreflang die Google
+         * ernaartoe stuurt. Dus laten we hem liggen.
+         */
+        if (! ArticleRoutes::publishesLocale($item['locale'] ?? null)) {
+            Log::info('[StrategyEngine] Artikel overgeslagen: de site publiceert deze taal niet.', [
+                'id' => $item['id'] ?? null,
+                'locale' => $item['locale'] ?? null,
+            ]);
+
+            return null;
+        }
+
         DB::beginTransaction();
 
         try {

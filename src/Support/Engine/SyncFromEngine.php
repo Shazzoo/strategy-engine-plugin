@@ -48,6 +48,15 @@ final class SyncFromEngine
             return false;
         }
 
+        if (! ArticleRoutes::publishesLocale($item['locale'] ?? null)) {
+            /* Geen fout: de Engine schrijft in de talen van het project en
+               deze site toont er minder. Overgeslagen is iets anders dan
+               mislukt, en de Engine hoort het verschil te weten. */
+            $this->engine->acknowledge($articleId, 'skipped');
+
+            return false;
+        }
+
         $article = $this->articles->processArticle($item);
 
         if (! $article) {
@@ -98,6 +107,14 @@ final class SyncFromEngine
             }
 
             foreach ($changes['data'] as $item) {
+                if (! ArticleRoutes::publishesLocale($item['locale'] ?? null)) {
+                    /* Terugmelden, anders komt hij elke ronde opnieuw
+                       voorbij als iets wat nog afgehandeld moet worden. */
+                    $this->engine->acknowledge((int) $item['id'], 'skipped');
+
+                    continue;
+                }
+
                 $article = $this->articles->processArticle($item);
 
                 if ($article) {
