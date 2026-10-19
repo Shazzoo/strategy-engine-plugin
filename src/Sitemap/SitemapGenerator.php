@@ -27,6 +27,10 @@ class SitemapGenerator implements SitemapGeneratorInterface
             $locales = [app()->getLocale()];
         }
 
+        /* Artikelen in een taal die deze site niet voert horen ook niet in
+           de sitemap: die url bestaat wel, maar hij is niet van ons. */
+        $locales = array_values(array_filter($locales, fn ($locale): bool => ArticleRoutes::publishesLocale((string) $locale)));
+
         $multilang = ArticleRoutes::usesLocalizedRoutes();
         $defaultLocale = ArticleRoutes::defaultLocale();
         $clusters = $multilang ? $this->clusters() : collect();
@@ -103,7 +107,7 @@ class SitemapGenerator implements SitemapGeneratorInterface
             ];
         }
 
-        return HreflangAlternates::build($candidates, $defaultLocale);
+        return HreflangAlternates::build($candidates, $defaultLocale, ArticleRoutes::publishedLocales());
     }
 
     /**
@@ -119,6 +123,6 @@ class SitemapGenerator implements SitemapGeneratorInterface
             'url' => ArticleRoutes::indexUrl($loc, $prefix),
         ], $ordered);
 
-        return HreflangAlternates::build($candidates, $defaultLocale);
+        return HreflangAlternates::build($candidates, $defaultLocale, ArticleRoutes::publishedLocales());
     }
 }

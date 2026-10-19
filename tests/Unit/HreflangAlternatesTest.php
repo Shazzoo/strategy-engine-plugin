@@ -80,3 +80,42 @@ test('zonder bekende standaardtaal blijven de talen gewoon staan', function () {
     expect($alternates)->toHaveCount(2)
         ->and(array_column($alternates, 'locale'))->toBe(['nl', 'en']);
 });
+
+/**
+ * De Engine schrijft in de talen van het project; een site toont er soms
+ * minder. shazzoo.nl staat op Nederlands en Engels terwijl er ook Duits
+ * geschreven wordt - en dan hoort die Duitse regel hier niet te staan.
+ */
+test('a language the site does not publish is left out', function () {
+    $alternates = HreflangAlternates::build([
+        ['locale' => 'nl', 'url' => 'https://shazzoo.nl/kennisbank/artikel'],
+        ['locale' => 'en', 'url' => 'https://shazzoo.nl/en/knowledge-base/article'],
+        ['locale' => 'de', 'url' => 'https://shazzoo.nl/de/kennisbank/artikel'],
+    ], 'nl', ['nl', 'en']);
+
+    expect(array_column($alternates, 'locale'))->toBe(['nl', 'en', 'x-default']);
+});
+
+test('without a known list of languages nothing is held back', function () {
+    $alternates = HreflangAlternates::build([
+        ['locale' => 'nl', 'url' => 'https://shazzoo.nl/kennisbank/artikel'],
+        ['locale' => 'de', 'url' => 'https://shazzoo.nl/de/kennisbank/artikel'],
+    ], 'nl', []);
+
+    expect(array_column($alternates, 'locale'))->toBe(['nl', 'de', 'x-default']);
+});
+
+/**
+ * Houdt het filter één taal over, dan is er niets te kiezen en hoort er
+ * ook geen x-default te staan.
+ */
+test('filtering down to one language drops the x-default too', function () {
+    $alternates = HreflangAlternates::build([
+        ['locale' => 'nl', 'url' => 'https://shazzoo.nl/kennisbank/artikel'],
+        ['locale' => 'de', 'url' => 'https://shazzoo.nl/de/kennisbank/artikel'],
+    ], 'nl', ['nl']);
+
+    expect($alternates)->toBe([
+        ['locale' => 'nl', 'url' => 'https://shazzoo.nl/kennisbank/artikel'],
+    ]);
+});

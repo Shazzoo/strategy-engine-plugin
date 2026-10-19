@@ -49,6 +49,38 @@ final class ArticleRoutes
     }
 
     /**
+     * De talen die deze site publiceert.
+     *
+     * De Engine schrijft in de talen van het project, en dat zijn er soms
+     * meer dan de site toont: shazzoo.nl staat op Nederlands en Engels
+     * terwijl de Engine er ook Duits bij schrijft. Zulke artikelen horen
+     * hier niet te landen en al helemaal niet in een hreflang-set, want
+     * die wijst Google dan naar een taal die de site niet voert.
+     *
+     * Noemt Core geen talen, dan houden we niets tegen: niets weten is
+     * geen reden om iets te verbergen.
+     *
+     * @return array<int, string>
+     */
+    public static function publishedLocales(): array
+    {
+        $runtime = function_exists('cms_runtime') ? cms_runtime() : [];
+
+        return array_values(array_filter(array_map(
+            fn ($locale): string => mb_strtolower(trim((string) $locale)),
+            (array) ($runtime['available_locales'] ?? []),
+        ), 'filled'));
+    }
+
+    public static function publishesLocale(?string $locale): bool
+    {
+        $locale = mb_strtolower(trim((string) $locale));
+        $published = self::publishedLocales();
+
+        return $locale === '' || $published === [] || in_array($locale, $published, true);
+    }
+
+    /**
      * De standaardtaal van de site, zoals Core hem kent. Die bepaalt welke
      * url x-default krijgt.
      */

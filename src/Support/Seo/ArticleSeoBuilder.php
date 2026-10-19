@@ -201,7 +201,7 @@ final class ArticleSeoBuilder
             }
         }
 
-        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale());
+        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale(), ArticleRoutes::publishedLocales());
     }
 
     /**
@@ -231,7 +231,7 @@ final class ArticleSeoBuilder
             'url' => $this->articleIndexUrl($loc),
         ], $ordered);
 
-        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale());
+        return HreflangAlternates::build($candidates, ArticleRoutes::defaultLocale(), ArticleRoutes::publishedLocales());
     }
 
     /**
