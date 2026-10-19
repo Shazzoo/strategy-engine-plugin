@@ -1,6 +1,18 @@
 <?php
 
 return [
+    /*
+     * Wat er in het schema en de deelkaarten van de artikelen komt te
+     * staan. Leeg laten mag: de naam van de applicatie en de vertaalde
+     * omschrijving vullen de gaten, en een logo dat we niet weten laten we
+     * liever weg dan dat we er een verkeerd neerzetten.
+     */
+    'seo' => [
+        'publisher_logo' => env('CONTENT_STUDIO_PUBLISHER_LOGO'),
+        'index_description' => env('CONTENT_STUDIO_INDEX_DESCRIPTION'),
+        'index_image' => env('CONTENT_STUDIO_INDEX_IMAGE'),
+    ],
+
     'engine' => [
         'api_url' => env('CONTENT_STUDIO_ENGINE_API_URL', 'https://engine.content-studio.com/api/v1'),
 

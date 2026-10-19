@@ -28,7 +28,8 @@ final class ArticleSeoBuilder
             $alternates = [];
         }
 
-        $description = 'Ontdek de laatste trends over Laravel, AI-oplossingen en softwareontwikkeling bij Shazzoo.';
+        $description = (string) (config('content-studio.seo.index_description')
+            ?: __('strategy-engine::content_studio.blog_description'));
 
         // Bouw ItemList voor JSON-LD als je artikelen meegeeft
         $itemList = [];
@@ -57,7 +58,7 @@ final class ArticleSeoBuilder
                 'description' => $description,
                 'url' => $canonical,
                 'type' => 'website',
-                'image' => 'https://shazzoo.nl/images/og-blog-overview.png', // Nooit null laten!
+                'image' => config('content-studio.seo.index_image'),
             ],
             jsonLd: [
                 '@context' => 'https://schema.org',
@@ -65,11 +66,8 @@ final class ArticleSeoBuilder
                 'name' => $title,
                 'description' => $description,
                 'url' => $canonical,
-                'publisher' => [
-                    '@type' => 'Organization',
-                    'name' => $appName,
-                    'logo' => ['@type' => 'ImageObject', 'url' => 'https://shazzoo.nl/themes/shazzoo-corporate-theme/images/shazzooVert.svg'],
-                ],
+                'inLanguage' => $locale ?: app()->getLocale(),
+                'publisher' => self::publisherNode((string) $appName, config('content-studio.seo.publisher_logo')),
                 'mainEntity' => [
                     '@type' => 'ItemList',
                     'itemListElement' => $itemList,
@@ -121,8 +119,8 @@ final class ArticleSeoBuilder
                 'description' => $ogDescription,
                 'url' => $canonical,
                 'type' => 'article',
-                'article:published_time' => $article->created_at?->toIso8601String(),
-                'article:author' => 'Shazzoo Engineering Team', // Harde referentie naar auteur
+                'article:published_time' => $this->publishedAt($article)?->toIso8601String(),
+                'article:author' => filled($article->author_name) ? $article->author_name : config('app.name'),
                 'image' => $image_url, // Voeg eventueel een afbeelding toe
             ],
             jsonLd: [
@@ -131,21 +129,11 @@ final class ArticleSeoBuilder
                 'headline' => $article->title ?? $title,
                 'description' => $description,
                 'url' => $canonical,
-                'datePublished' => $article->created_at?->toIso8601String(),
-                'dateModified' => $article->updated_at?->toIso8601String() ?? $article->created_at?->toIso8601String(),
-                'author' => [
-                    '@type' => 'Organization',
-                    'name' => 'Shazzoo',
-                    'url' => 'https://shazzoo.nl',
-                ],
-                'publisher' => [
-                    '@type' => 'Organization',
-                    'name' => 'Shazzoo',
-                    'logo' => [
-                        '@type' => 'ImageObject',
-                        'url' => 'https://shazzoo.nl/themes/shazzoo-corporate-theme/images/shazzooVert.svg',
-                    ],
-                ],
+                'inLanguage' => $locale ?: $article->locale,
+                'datePublished' => $this->publishedAt($article)?->toIso8601String(),
+                'dateModified' => ($article->updated_at ?? $this->publishedAt($article))?->toIso8601String(),
+                'author' => self::authorNode($article->author_name, $article->author_role_title, (string) config('app.name')),
+                'publisher' => self::publisherNode((string) config('app.name'), config('content-studio.seo.publisher_logo')),
                 'mainEntityOfPage' => [
                     '@type' => 'WebPage',
                     '@id' => $canonical,
@@ -235,6 +223,50 @@ final class ArticleSeoBuilder
     }
 
     /**
+     * Wie het artikel geschreven heeft, als schema.org-knoop.
+     *
+     * De Engine levert een naam en vaak een functie; die horen als Person
+     * in het schema, want dat is het E-E-A-T-signaal waar zoekmachines en
+     * AI-assistenten op letten. Levert hij niets, dan valt het terug op de
+     * organisatie - en dat is de naam van déze site, niet die van ons.
+     *
+     * @return array<string, mixed>
+     */
+    public static function authorNode(?string $name, ?string $role, string $organisation): array
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return ['@type' => 'Organization', 'name' => $organisation];
+        }
+
+        $role = trim((string) $role);
+
+        return array_filter([
+            '@type' => 'Person',
+            'name' => $name,
+            'jobTitle' => $role !== '' ? $role : null,
+        ], fn ($value) => $value !== null);
+    }
+
+    /**
+     * De uitgever: deze site. Een logo alleen als we er een weten - een
+     * verkeerd logo in het schema is erger dan geen logo.
+     *
+     * @return array<string, mixed>
+     */
+    public static function publisherNode(string $organisation, ?string $logo): array
+    {
+        $logo = trim((string) $logo);
+
+        return array_filter([
+            '@type' => 'Organization',
+            'name' => $organisation,
+            'logo' => $logo !== '' ? ['@type' => 'ImageObject', 'url' => $logo] : null,
+        ], fn ($value) => $value !== null);
+    }
+
+    /**
      * De eerste waarde die daadwerkelijk gevuld is; lege strings tellen niet mee.
      */
     private function firstFilled(?string ...$values): ?string
@@ -246,6 +278,16 @@ final class ArticleSeoBuilder
         }
 
         return null;
+    }
+
+    /**
+     * Wanneer het artikel is uitgekomen. generated_at komt van de Engine;
+     * created_at is het moment waarop de rij hier is aangemaakt, en dat is
+     * de dag van de sync - niet van het artikel.
+     */
+    private function publishedAt(ContentStudioArticle $article)
+    {
+        return $article->generated_at ?: $article->created_at;
     }
 
     private function articleIndexUrl(?string $locale = null, array $parameters = []): string

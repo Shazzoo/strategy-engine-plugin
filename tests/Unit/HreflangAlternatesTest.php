@@ -1,5 +1,6 @@
 <?php
 
+use Shazzoo\StrategyEngine\Support\Seo\ArticleSeoBuilder;
 use Shazzoo\StrategyEngine\Support\Seo\HreflangAlternates;
 
 test('één taal levert geen x-default op', function () {
@@ -118,4 +119,37 @@ test('filtering down to one language drops the x-default too', function () {
     expect($alternates)->toBe([
         ['locale' => 'nl', 'url' => 'https://shazzoo.nl/kennisbank/artikel'],
     ]);
+});
+
+/**
+ * Het schema noemde tot nu toe altijd Shazzoo als auteur en uitgever,
+ * ook op de site van een andere klant.
+ */
+test('the author is the person the engine named', function () {
+    expect(ArticleSeoBuilder::authorNode('Erwin van den Berg', 'Software Architect', 'Acme BV'))
+        ->toBe(['@type' => 'Person', 'name' => 'Erwin van den Berg', 'jobTitle' => 'Software Architect']);
+});
+
+test('without a role the person stands on their own', function () {
+    expect(ArticleSeoBuilder::authorNode('Erwin van den Berg', null, 'Acme BV'))
+        ->toBe(['@type' => 'Person', 'name' => 'Erwin van den Berg']);
+});
+
+test('without a name the site itself is the author', function () {
+    expect(ArticleSeoBuilder::authorNode('  ', 'Software Architect', 'Acme BV'))
+        ->toBe(['@type' => 'Organization', 'name' => 'Acme BV']);
+});
+
+test('a publisher without a known logo carries none', function () {
+    expect(ArticleSeoBuilder::publisherNode('Acme BV', null))
+        ->toBe(['@type' => 'Organization', 'name' => 'Acme BV']);
+});
+
+test('a known logo is carried as an image', function () {
+    expect(ArticleSeoBuilder::publisherNode('Acme BV', 'https://acme.test/logo.svg'))
+        ->toBe([
+            '@type' => 'Organization',
+            'name' => 'Acme BV',
+            'logo' => ['@type' => 'ImageObject', 'url' => 'https://acme.test/logo.svg'],
+        ]);
 });
