@@ -58,7 +58,7 @@ final class ArticleSeoBuilder
                 'description' => $description,
                 'url' => $canonical,
                 'type' => 'website',
-                'image' => config('content-studio.seo.index_image'),
+                'image' => config('content-studio.seo.index_image') ?: $this->defaultImage(),
             ],
             jsonLd: [
                 '@context' => 'https://schema.org',
@@ -75,6 +75,15 @@ final class ArticleSeoBuilder
             ],
             robots: 'index,follow',
         );
+    }
+
+    /**
+     * De standaard Open Graph-afbeelding uit de globale instellingen, voor een
+     * overzicht of artikel zonder eigen afbeelding.
+     */
+    private function defaultImage(): ?string
+    {
+        return media_url(setting('seo_default_og_image_id'));
     }
 
     /**
@@ -108,6 +117,8 @@ final class ArticleSeoBuilder
         if ($image_url && ! str_starts_with($image_url, 'http')) {
             $image_url = asset("storage/{$image_url}");
         }
+
+        $image_url = $image_url ?: $this->defaultImage();
 
         return new SeoMetadata(
             title: $title,
