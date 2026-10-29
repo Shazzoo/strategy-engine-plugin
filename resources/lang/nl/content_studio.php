@@ -3,6 +3,8 @@
 return [
     'articles' => 'Artikelen',
     'blog_eyebrow' => 'Insights',
+    'index_title' => 'Artikelen & Insights',
+    'index_page' => 'Pagina :page',
     'blog_description' => 'Lees praktische artikelen over contentstrategie, AI-workflows en digitale groei.',
     'all_articles' => 'Alle artikelen',
     'read_more' => 'Lees meer',

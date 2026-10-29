@@ -3,6 +3,8 @@
 return [
     'articles' => 'Articles',
     'blog_eyebrow' => 'Insights',
+    'index_title' => 'Articles & Insights',
+    'index_page' => 'Page :page',
     'blog_description' => 'Read practical articles about content strategy, AI workflows, and digital growth.',
     'all_articles' => 'All articles',
     'read_more' => 'Read more',

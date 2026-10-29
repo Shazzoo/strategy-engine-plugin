@@ -11,14 +11,14 @@ final class ArticleSeoBuilder
     public function indexBuild($articles = null, ?string $locale = null): SeoMetadata
     {
         $appName = config('app.name');
-        $title = "Artikelen & Insights - {$appName}";
+        $title = __('strategy-engine::content_studio.index_title')." - {$appName}";
 
         $currentPage = request()->get('page', 1);
         $canonical = $this->articleIndexUrl($locale);
         $alternates = $this->indexAlternates($locale);
 
         if ($currentPage > 1) {
-            $title .= " - Pagina {$currentPage}";
+            $title .= ' - '.__('strategy-engine::content_studio.index_page', ['page' => $currentPage]);
             $canonical = $this->articleIndexUrl($locale, ['page' => $currentPage]);
 
             /* Vanaf pagina 2 geen hreflang. Een andere taal heeft een andere
