@@ -2,6 +2,8 @@
 
 namespace Shazzoo\StrategyEngine\Support\Publication;
 
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
 use Shazzoo\StrategyEngine\Support\Engine\ConfirmPublished;
@@ -40,6 +42,42 @@ final class Publication
     /** Minuten tussen een tijdelijke waarschuwing en de volgende poging. */
     public const REVERIFY_AFTER_MINUTES = 5;
 
+    /** De kolommen die de migratie van deze laag toevoegt. */
+    private const COLUMNS = ['provenance', 'provenance_state', 'disclosure_mode', 'verification_status', 'reverify_count'];
+
+    private static ?bool $installed = null;
+
+    /**
+     * Of de migratie voor provenance en verificatie gedraaid is. Een site die
+     * de plugin bijwerkt zonder php artisan migrate moet artikelen blijven
+     * ontvangen: dan slaat hij ze op zoals voorheen, zonder verantwoording
+     * en zonder verificatie, en zegt het log wat er nog moet gebeuren.
+     */
+    public static function installed(): bool
+    {
+        if (self::$installed !== null) {
+            return self::$installed;
+        }
+
+        try {
+            self::$installed = Schema::hasColumns((new ContentStudioArticle)->getTable(), self::COLUMNS);
+        } catch (\Throwable) {
+            self::$installed = false;
+        }
+
+        if (! self::$installed) {
+            Log::warning('[StrategyEngine] De provenance-kolommen ontbreken; draai php artisan migrate. Artikelen komen binnen zonder verantwoording en zonder verificatie.');
+        }
+
+        return self::$installed;
+    }
+
+    /** @internal Voor tests die de kolommen weghalen of terugzetten. */
+    public static function forgetInstalled(): void
+    {
+        self::$installed = null;
+    }
+
     /**
      * Stap 1: de provenance uit de aanlevering valideren. Ongeldig betekent
      * hier niet "niet publiceren" maar "zonder blok publiceren en het
@@ -66,6 +104,10 @@ final class Publication
      */
     public static function record(ContentStudioArticle $article, array $prepared): void
     {
+        if (! self::installed()) {
+            return;
+        }
+
         if ($prepared['provenance'] !== null) {
             self::store($article, $prepared['provenance']);
         } elseif (! $prepared['present']) {
@@ -115,6 +157,13 @@ final class Publication
      */
     public static function finalize(ContentStudioArticle $article, array $options = []): array
     {
+        if (! self::installed()) {
+            return PublicationVerifier::withWarnings(
+                PublicationVerifier::result(PublicationVerifier::PUBLISHED_WITH_WARNING, [], self::url($article), ''),
+                ['provenance_migration_pending'],
+            );
+        }
+
         if (! $article->isPublic()) {
             return self::storeResult($article, PublicationVerifier::result(
                 PublicationVerifier::PUBLICATION_FAILED,
@@ -229,6 +278,10 @@ final class Publication
      */
     public static function reverifyDue(): int
     {
+        if (! self::installed()) {
+            return 0;
+        }
+
         $due = ContentStudioArticle::query()
             ->where('verification_status', PublicationVerifier::PUBLISHED_WITH_WARNING)
             ->where('reverify_count', '<', self::MAX_REVERIFY)

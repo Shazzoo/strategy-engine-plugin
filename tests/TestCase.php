@@ -68,6 +68,8 @@ abstract class TestCase extends Orchestra
 
     protected function defineDatabaseMigrations(): void
     {
+        \Shazzoo\StrategyEngine\Support\Publication\Publication::forgetInstalled();
+
         // Wat Core zelf aanmaakt en de plugin leest.
         Schema::create('settings', function (Blueprint $table) {
             $table->id();

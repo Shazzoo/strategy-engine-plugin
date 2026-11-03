@@ -334,3 +334,30 @@ test('recovery from the command line', function () {
         ->and(stored()->body_revision)->toBe(self::REVISION_2)
         ->and($this->acknowledgements()[0]['verification']['publication_status'])->toBe(Verifier::VERIFIED);
 });
+
+test('a site that updated without migrating keeps receiving articles', function () {
+    $migration = include dirname(__DIR__, 2).'/database/migrations/2026_11_03_000000_add_provenance_to_content_studio_articles_table.php';
+    $migration->down();
+    Publication::forgetInstalled();
+
+    $this->serveSite();
+    $article = $this->receive($this->provenance('scout', complete()));
+
+    expect($article)->not->toBeNull()
+        ->and(ContentStudioArticle::count())->toBe(1)
+        ->and($this->page())->toContain('De tekst van het artikel.');
+
+    $result = Publication::finalize($article);
+
+    expect(Publication::succeeded($result))->toBeTrue()
+        ->and($result['warnings'])->toBe(['provenance_migration_pending'])
+        ->and(Artisan::call('content-studio:provenance', ['action' => 'due']))->toBe(0);
+
+    // Na de migratie werkt alles weer.
+    $migration->up();
+    Publication::forgetInstalled();
+    $article = $this->receive($this->provenance('scout', complete()));
+
+    expect($article->provenance_state)->toBe(ContentStudioArticle::STATE_VALID)
+        ->and(Disclosure::count($this->page()))->toBe(1);
+});

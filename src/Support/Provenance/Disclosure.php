@@ -201,6 +201,10 @@ final class Disclosure
      */
     public static function syncBody(ContentStudioArticle $article): void
     {
+        if (! \Shazzoo\StrategyEngine\Support\Publication\Publication::installed()) {
+            return;
+        }
+
         if (self::mode($article) === self::MODE_BODY) {
             self::applyBodyFallback($article);
         } elseif (self::count($article->body_html) > 0 || $article->disclosure_mode !== null) {
