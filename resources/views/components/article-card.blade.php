@@ -3,7 +3,7 @@
 @php
     use Illuminate\Support\Facades\Storage;
 
-    $image_url = Storage::disk('public')->url($article->featured_image_url);
+    $image_url = $article->featuredImageUrl();
     $locale = app()->getLocale();
     $setting = \Shazzoo\StrategyEngine\Models\ContentStudioSetting::singleton();
     $prefix = trim((string) ($setting->route_prefix ?: 'blog'), '/');
@@ -25,10 +25,12 @@
     @endif
 
     <div class="flex h-full flex-col">
-        <div class="mb-4 overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
-            <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
-                class="cs-featured-image transition duration-500 group-hover:scale-105">
-        </div>
+        @if ($image_url)
+            <div class="mb-4 overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+                <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
+                    class="cs-featured-image transition duration-500 group-hover:scale-105">
+            </div>
+        @endif
 
         <div class="flex-1">
             <div class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4">

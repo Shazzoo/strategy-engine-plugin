@@ -210,7 +210,94 @@ class ContentStudioArticle extends Model
 
     public function thumbnailUrl(): ?string
     {
-        return $this->featured_image_url;
+        return $this->featuredImagePath();
+    }
+
+    /**
+     * Het pad van de uitgelichte afbeelding op de public disk, of null als
+     * er geen is. Oudere syncs bewaarden bij een artikel zonder afbeelding
+     * een pad als content_studio_images/2333/. - dat is er ook geen.
+     */
+    public function featuredImagePath(): ?string
+    {
+        $path = trim((string) $this->featured_image_url);
+
+        if ($path === '' || in_array(pathinfo($path, PATHINFO_BASENAME), ['.', '..'], true) || pathinfo($path, PATHINFO_FILENAME) === '') {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /** De publieke URL van de uitgelichte afbeelding, of null. */
+    public function featuredImageUrl(): ?string
+    {
+        $path = $this->featuredImagePath();
+
+        if ($path === null) {
+            return null;
+        }
+
+        return str_starts_with($path, 'http') ? $path : \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+    }
+
+    /**
+     * De artikelen die een hub bundelt, in zijn eigen taal.
+     *
+     * Twee bronnen, want de Engine legt het op twee manieren vast: een
+     * cluster-hub via hub_content_id op elk artikel, een pillar-hub alleen
+     * in de linklijst die hij zelf in de hub zet (HUB_LINKS). Die lijst is
+     * wat de lezer ziet, dus wat erin staat en hier bestaat, hoort erbij.
+     */
+    public function hubChildren(): \Illuminate\Support\Collection
+    {
+        if ($this->hubChildrenCache !== null) {
+            return $this->hubChildrenCache;
+        }
+
+        $slugs = self::hubLinkSlugs((string) $this->body_html);
+
+        return $this->hubChildrenCache = static::query()
+            ->where('locale', $this->locale)
+            ->whereKeyNot($this->getKey())
+            ->where(function ($query) use ($slugs) {
+                $query->where('hub_content_id', $this->content_studio_article_id);
+
+                if ($slugs !== []) {
+                    $query->orWhereIn('slug', $slugs);
+                }
+            })
+            ->orderByDesc('generated_at')
+            ->get();
+    }
+
+    private ?\Illuminate\Support\Collection $hubChildrenCache = null;
+
+    /**
+     * De slugs in het linkblok dat de Engine in een hub zet.
+     *
+     * @return string[]
+     */
+    public static function hubLinkSlugs(string $html): array
+    {
+        if (! preg_match('/<!--HUB_LINKS_START-->(.*?)<!--HUB_LINKS_END-->/s', $html, $block)) {
+            return [];
+        }
+
+        preg_match_all('/href="([^"]+)"/i', $block[1], $links);
+
+        $slugs = [];
+
+        foreach ($links[1] as $href) {
+            $path = trim((string) parse_url(html_entity_decode($href), PHP_URL_PATH), '/');
+            $slug = $path === '' ? '' : basename($path);
+
+            if ($slug !== '') {
+                $slugs[] = $slug;
+            }
+        }
+
+        return array_values(array_unique($slugs));
     }
 
     /** Excerpt uit de Engine, of anders een ingekorte versie van de body. */

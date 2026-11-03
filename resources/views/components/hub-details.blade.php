@@ -12,7 +12,7 @@
     $locale = $locale ?? app()->getLocale();
     $date = $date ?? locale_date($article->generated_at);
     $readTime = $readTime ?? read_time($article->body_html);
-    $image_url = $image_url ?? \Illuminate\Support\Facades\Storage::disk('public')->url($article->featured_image_url);
+    $image_url = $image_url ?? $article->featuredImageUrl();
     $processedBody = $processedBody ?? $article->body_html;
     $authors = $article->bylineNames();
 @endphp
@@ -36,13 +36,15 @@
                 </div>
             </div>
 
-            <div class="block md:w-1/3">
-                <div class="relative">
-                    <div class="absolute inset-0 rotate-2 rounded-lg bg-amber-soft"></div>
-                    <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
-                        class="cs-featured-image relative aspect-[16/9] w-full -rotate-2 rounded-lg border border-line object-cover shadow-sm transition duration-500 hover:rotate-0">
+            @if ($image_url)
+                <div class="block md:w-1/3">
+                    <div class="relative">
+                        <div class="absolute inset-0 rotate-2 rounded-lg bg-amber-soft"></div>
+                        <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
+                            class="cs-featured-image relative aspect-[16/9] w-full -rotate-2 rounded-lg border border-line object-cover shadow-sm transition duration-500 hover:rotate-0">
+                    </div>
                 </div>
-            </div>
+            @endif
         </div>
     </header>
     <div class="mx-auto max-w-7xl py-16">
@@ -86,6 +88,7 @@
 
                 <x-strategy-engine::provenance :article="$article" :at="['author', 'bottom']" />
 
+                @if ($article->hubChildren()->isNotEmpty())
                 <section id="verdieping" class="mt-24 border-t border-line pt-16">
                     <h2 class="mb-2 text-3xl font-black text-ink-950">
                         {{ __('strategy-engine::content_studio.cluster_overview') }}
@@ -94,11 +97,12 @@
                         {{ __('strategy-engine::content_studio.dive_into_details') }}</p>
 
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        @foreach ($article->related_hub_articles as $child_article)
+                        @foreach ($article->hubChildren() as $child_article)
                             <x-strategy-engine::article-card :article="$child_article" :clickable="true" />
                         @endforeach
                     </div>
                 </section>
+                @endif
             </section>
         </div>
     </div>

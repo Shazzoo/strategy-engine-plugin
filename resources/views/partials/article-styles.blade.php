@@ -150,5 +150,88 @@
         .cs-provenance__text {
             margin: 0.75rem 0 0;
         }
+
+        /* Hubkaart in het overzicht: over de volle breedte van het raster,
+           met de afbeelding links als die er is. */
+        .cs-hub {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            margin: 2rem 0;
+        }
+
+        .cs-hub__media {
+            overflow: hidden;
+        }
+
+        .cs-hub__content {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem;
+        }
+
+        .cs-hub__title {
+            margin: 0 0 1rem;
+            font-size: 1.875rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .cs-hub__excerpt {
+            margin: 0;
+            font-size: 1.125rem;
+            font-style: italic;
+            line-height: 1.625;
+            max-width: 48rem;
+        }
+
+        .cs-hub__footer {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top-width: 1px;
+            border-top-style: solid;
+        }
+
+        .cs-hub__label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--amber-600, #d97706);
+        }
+
+        @media (min-width: 640px) {
+            .cs-hub__footer {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .cs-hub__content {
+                padding: 2.5rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .cs-hub--image {
+                flex-direction: row;
+            }
+
+            .cs-hub--image .cs-hub__media {
+                flex: 0 0 45%;
+            }
+
+            .cs-hub--image .cs-hub__media .cs-featured-image {
+                height: 100%;
+            }
+        }
     </style>
 @endonce

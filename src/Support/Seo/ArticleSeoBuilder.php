@@ -113,7 +113,7 @@ final class ArticleSeoBuilder
         //    anderstalige bezoeker bij zijn eigen versie uitkomt.
         $alternates = $this->articleAlternates($article, $locale);
 
-        $image_url = $article->featured_image_url ?? null;
+        $image_url = $article->featuredImagePath();
         // MAKE ABSOLUTE URL IF NOT ALREADY. IT IS LOCATED IN PUBLIC STORAGE.
         if ($image_url && ! str_starts_with($image_url, 'http')) {
             $image_url = asset("storage/{$image_url}");

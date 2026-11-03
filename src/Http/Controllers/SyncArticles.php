@@ -337,7 +337,8 @@ class SyncArticles
                     'title' => $title,
                     'excerpt' => $excerpt,
                     'body_html' => $body_html,
-                    'featured_image_url' => $upload_path,
+                    // Geen afbeelding uit de Engine is geen pad.
+                    'featured_image_url' => $featured_image_url ? $upload_path : null,
                     'featured_image_alt' => $featured_image_alt,
                     'meta_description' => $meta_description,
                     'seo_title' => $seo_title,

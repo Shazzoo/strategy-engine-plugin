@@ -197,3 +197,50 @@ test('an article with invalid provenance is published without a block', function
         ->and(ContentStudioArticle::first()->provenance_state)->toBe(ContentStudioArticle::STATE_INVALID)
         ->and(ContentStudioArticle::first()->provenance)->toBeNull();
 });
+
+test('a hub without an image gets a full-width card without a broken image', function () {
+    $this->receive($this->provenance('scout'), ['content_type' => 'hub', 'featured_image_url' => null]);
+
+    $hub = ContentStudioArticle::first();
+    $overview = $this->renderPage('http://localhost/blog')[0];
+    preg_match('#<div class="cs-hub .*?</a>#s', $overview, $card);
+
+    expect($hub->featured_image_url)->toBeNull()
+        ->and($card[0] ?? '')->not->toBe('')
+        ->and($card[0])->not->toContain('<img')
+        ->and($card[0])->not->toContain('cs-hub--image')
+        ->and($card[0])->not->toContain('verdiepende')
+        ->and($overview)->toContain('.cs-hub {')
+        ->and($this->page())->not->toContain('content_studio_images/');
+});
+
+test('an old empty image path counts as no image, also in the share image', function () {
+    $this->receive($this->provenance('scout'));
+    ContentStudioArticle::first()->forceFill(['featured_image_url' => 'content_studio_images/4711/.'])->save();
+
+    $html = $this->page();
+
+    expect(ContentStudioArticle::first()->featuredImagePath())->toBeNull()
+        ->and($html)->not->toContain('content_studio_images/4711/.')
+        ->and($html)->not->toContain('<img src="http://localhost/storage/content_studio_images');
+});
+
+test('a hub counts its articles from its own link list as well as hub_content_id', function () {
+    // Een pillar-hub: de Engine zet geen hub_content_id, alleen de linklijst.
+    $this->receive($this->provenance('scout'), ['id' => 5001, 'slug' => '5001-eerste', 'title' => 'Eerste']);
+    $this->receive($this->provenance('scout'), ['id' => 5002, 'slug' => '5002-tweede', 'title' => 'Tweede']);
+    // Een cluster-artikel dat via hub_content_id bij de hub hoort.
+    $this->receive($this->provenance('scout'), ['id' => 5003, 'slug' => '5003-derde', 'title' => 'Derde', 'hub_content_id' => 4711]);
+    // In een andere taal: telt niet.
+    $this->receive($this->provenance('scout'), ['id' => 5004, 'slug' => '5004-fourth', 'title' => 'Fourth', 'locale' => 'en']);
+
+    $this->receive($this->provenance('scout'), [
+        'content_type' => 'hub',
+        'body_html' => '<p>Gids.</p><!--HUB_LINKS_START--><ul><li><a href="5001-eerste">Eerste</a></li><li><a href="https://elders.example/blog/5002-tweede">Tweede</a></li><li><a href="5004-fourth">Fourth</a></li><li><a href="bestaat-niet">Weg</a></li></ul><!--HUB_LINKS_END-->',
+    ]);
+
+    $hub = ContentStudioArticle::where('content_studio_article_id', 4711)->first();
+
+    expect($hub->hubChildren()->pluck('content_studio_article_id')->sort()->values()->all())->toBe([5001, 5002, 5003])
+        ->and($this->renderPage('http://localhost/blog')[0])->toContain('3 verdiepende');
+});

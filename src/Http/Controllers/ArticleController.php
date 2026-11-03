@@ -192,7 +192,7 @@ class ArticleController
                 'title' => $article->title,
                 'description' => $article->meta_description,
                 'url' => ArticleRoutes::articleUrl($slug, $context['locale'], $prefix),
-                'image' => $article->featured_image_url,
+                'image' => $article->featuredImageUrl(),
             ],
         ]);
     }

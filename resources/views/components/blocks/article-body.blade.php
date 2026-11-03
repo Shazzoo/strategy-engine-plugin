@@ -7,7 +7,7 @@
     use Illuminate\Support\Facades\Storage;
     use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 
-    $image_url = Storage::disk('public')->url($article->featured_image_url);
+    $image_url = $article->featuredImageUrl();
     $locale = app()->getLocale();
     $date = locale_date($article->generated_at);
     $readTime = read_time($article->body_html);

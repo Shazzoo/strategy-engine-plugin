@@ -4,7 +4,7 @@
     $locale = $locale ?? app()->getLocale();
     $date = $date ?? locale_date($article->generated_at);
     $readTime = $readTime ?? read_time($article->body_html);
-    $image_url = $image_url ?? \Illuminate\Support\Facades\Storage::disk('public')->url($article->featured_image_url);
+    $image_url = $image_url ?? $article->featuredImageUrl();
     $prefix = trim((string) ($setting?->route_prefix ?? null ?: 'blog'), '/');
     $blogBasePath = \Shazzoo\StrategyEngine\Support\ArticleRoutes::indexPath($locale, $prefix);
 @endphp
@@ -19,10 +19,12 @@
         <x-strategy-engine::article-info :date="$date" :time="$readTime" :authors="$article->bylineNames()" :byline="$article->byline()" />
     </header>
 
-    <div class="mb-10">
-        <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
-            class="cs-featured-image aspect-[16/9] w-full rounded-lg border border-line bg-bg-alt object-cover shadow-sm">
-    </div>
+    @if ($image_url)
+        <div class="mb-10">
+            <img src="{{ $image_url }}" alt="{{ $article->featured_image_alt }}"
+                class="cs-featured-image aspect-[16/9] w-full rounded-lg border border-line bg-bg-alt object-cover shadow-sm">
+        </div>
+    @endif
 
     <div>
         @include('strategy-engine::partials.article-styles')
