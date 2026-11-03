@@ -101,5 +101,54 @@
             --cs-pull-quote-text: #ffffff;
             --cs-caption-text: #cbd5e1;
         }
+
+        /* Over dit artikel. Neemt de tekstkleur van de pagina over, dus
+           leesbaar op een lichte en een donkere achtergrond zonder dat het
+           thema iets hoeft te doen. */
+        .cs-provenance {
+            margin-block: 2.5rem;
+            padding: 1.25rem 1.5rem;
+            border: 1px solid rgb(127 127 127 / 0.35);
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            color: inherit;
+            background: transparent;
+        }
+
+        .cs-provenance__title {
+            margin: 0 0 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: inherit;
+        }
+
+        .cs-provenance__byline {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .cs-provenance__name {
+            color: inherit;
+            text-decoration: underline;
+            text-underline-offset: 0.15em;
+        }
+
+        .cs-provenance__name:focus-visible {
+            outline: 2px solid currentColor;
+            outline-offset: 2px;
+        }
+
+        .cs-provenance__role {
+            display: block;
+            font-weight: 400;
+            font-size: 0.875rem;
+        }
+
+        .cs-provenance__text {
+            margin: 0.75rem 0 0;
+        }
     </style>
 @endonce

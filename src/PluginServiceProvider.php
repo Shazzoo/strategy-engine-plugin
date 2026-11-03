@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Shazzoo\StrategyEngine\Console\Commands\ContentStudioArticleSync;
+use Shazzoo\StrategyEngine\Console\Commands\ContentStudioProvenance;
 use Shazzoo\StrategyEngine\Http\Controllers\ArticleController;
 use Shazzoo\StrategyEngine\Http\Controllers\EngineWebhookController;
 use Shazzoo\StrategyEngine\Http\Controllers\TrackingScriptController;
@@ -117,12 +118,19 @@ class PluginServiceProvider extends ServiceProvider
 
         $this->commands([
             ContentStudioArticleSync::class,
+            ContentStudioProvenance::class,
         ]);
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
             $schedule->command('content-studio:articles')
                 ->everyFifteenMinutes()
                 ->withoutOverlapping(); // alleen nuttig als je meerdere servers hebt
+
+            // Nog eens kijken na een cache die achterliep of een pagina die
+            // even niet bereikbaar was; zonder queue-worker.
+            $schedule->command('content-studio:provenance due')
+                ->everyFiveMinutes()
+                ->withoutOverlapping();
         });
 
         // COMPONENT NAMESPACE.

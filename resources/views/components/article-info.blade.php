@@ -1,11 +1,27 @@
 @props([
     'authors' => [],
+    'byline' => null,
     'date' => null,
     'time' => null,
 ])
 
 <div>
-    @if (count($authors = array_filter($authors)))
+    {{-- Met provenance: wie de Engine als auteur noemt, met wat er bij hoort
+         ("Samengesteld door Scout", met de rol eronder). Scout krijgt geen
+         initialen-avatar: dat is geen persoon. --}}
+    @if (is_array($byline) && filled($byline['prefix'] ?? null))
+        <p class="mb-1 text-sm text-ink-800" data-byline-kind="{{ $byline['kind'] }}">
+            {{ $byline['prefix'] }}
+            @if (filled($byline['url']))
+                <a href="{{ $byline['url'] }}" class="font-medium underline underline-offset-2">{{ $byline['name'] }}</a>
+            @else
+                <span class="font-medium">{{ $byline['name'] }}</span>
+            @endif
+            @if (filled($byline['role']))
+                <span class="block text-ink-400">{{ $byline['role'] }}</span>
+            @endif
+        </p>
+    @elseif (count($authors = array_filter($authors)))
         <div class="mb-1 flex items-center gap-2 text-sm text-ink-800">
             <div class="flex -space-x-2">
                 @forelse ($authors as $author)

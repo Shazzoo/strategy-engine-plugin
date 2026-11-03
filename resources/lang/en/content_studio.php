@@ -33,4 +33,7 @@ return [
     'publication' => 'Published',
     'reading_time_label' => 'Reading time',
     'reading_time_minutes' => ':minutes min',
+    'about_this_article' => 'About this article',
+    'compiled_by' => 'Compiled by',
+    'written_by' => 'Written by',
 ];

@@ -30,7 +30,8 @@
   "minimum-stability": "stable",
   "prefer-stable": true,
   "require-dev": {
-    "pestphp/pest": "^4.0"
+    "pestphp/pest": "^4.0",
+    "orchestra/testbench": "^11.3"
   },
   "config": {
     "allow-plugins": {

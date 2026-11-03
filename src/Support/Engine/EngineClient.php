@@ -129,7 +129,10 @@ final class EngineClient
         ];
     }
 
-    public function acknowledge(int $articleId, string $action, ?string $externalRef = null, ?string $url = null, ?string $error = null): bool
+    /**
+     * @param  array<string, mixed>|null  $verification  Wat de site na publicatie op de pagina zag (Publication::payload).
+     */
+    public function acknowledge(int $articleId, string $action, ?string $externalRef = null, ?string $url = null, ?string $error = null, ?array $verification = null): bool
     {
         $response = $this->call('post', $this->v2("/projects/{$this->code()}/sync/acknowledgements"), array_filter([
             'article_id' => $articleId,
@@ -137,6 +140,7 @@ final class EngineClient
             'external_ref' => $externalRef,
             'url' => $url,
             'error' => $error,
+            'verification' => $verification,
         ], fn ($value) => $value !== null));
 
         return $response !== null;

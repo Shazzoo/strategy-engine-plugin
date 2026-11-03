@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 use Shazzoo\StrategyEngine\Models\ContentStudioSetting;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
+use Shazzoo\StrategyEngine\Support\Publication\Publication;
 
 class ConfirmPublished
 {
@@ -34,6 +35,12 @@ class ConfirmPublished
         $content_id = $article->content_studio_article_id;
 
         if (! $content_id) {
+            return false;
+        }
+
+        /* Niet als live melden wat tegengehouden is, offline is gehaald, of
+           waarvan de verificatie zag dat de verantwoording niet klopt. */
+        if (! Publication::mayConfirm($article)) {
             return false;
         }
 

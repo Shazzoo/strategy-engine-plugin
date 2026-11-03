@@ -4,6 +4,7 @@ namespace Shazzoo\StrategyEngine\Support\Seo;
 
 use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
+use Shazzoo\StrategyEngine\Support\Provenance\ProvenanceSchema;
 use Shazzoo\ContentStudioCore\Support\Seo\Dto\SeoMetadata;
 
 final class ArticleSeoBuilder
@@ -120,6 +121,10 @@ final class ArticleSeoBuilder
 
         $image_url = $image_url ?: $this->defaultImage();
 
+        // 6. Wie het schreef, wie het uitgeeft en wie het las: met provenance
+        //    precies wat de Engine vaststelde, anders zoals voorheen.
+        $people = $this->people($article, $canonical);
+
         return new SeoMetadata(
             title: $title,
             description: $description,
@@ -131,7 +136,7 @@ final class ArticleSeoBuilder
                 'url' => $canonical,
                 'type' => 'article',
                 'article:published_time' => $this->publishedAt($article)?->toIso8601String(),
-                'article:author' => filled($article->author_name) ? $article->author_name : config('app.name'),
+                'article:author' => $people['og_author'],
                 'image' => $image_url, // Voeg eventueel een afbeelding toe
             ],
             jsonLd: [
@@ -143,12 +148,15 @@ final class ArticleSeoBuilder
                 'inLanguage' => $locale ?: $article->locale,
                 'datePublished' => $this->publishedAt($article)?->toIso8601String(),
                 'dateModified' => ($article->updated_at ?? $this->publishedAt($article))?->toIso8601String(),
-                'author' => self::authorNode($article->author_name, $article->author_role_title, (string) config('app.name')),
-                'publisher' => self::publisherNode((string) config('app.name'), config('content-studio.seo.publisher_logo')),
-                'mainEntityOfPage' => [
+                'author' => $people['author'],
+                'publisher' => $people['publisher'],
+                'contributor' => $people['contributor'],
+                'mainEntityOfPage' => array_filter([
                     '@type' => 'WebPage',
                     '@id' => $canonical,
-                ],
+                    // Alleen als een mens het las; nooit Scout, nooit een vermoeden.
+                    'reviewedBy' => $people['reviewer'],
+                ]),
                 'image' => $image_url ? [
                     '@type' => 'ImageObject',
                     'url' => $image_url,
@@ -156,6 +164,44 @@ final class ArticleSeoBuilder
             ],
             robots: $robots,
         );
+    }
+
+    /**
+     * Auteur, uitgever, bijdragers en beoordelaar voor dit artikel.
+     *
+     * Met geldige provenance komen ze daaruit: één auteur (een Person alleen
+     * voor een echt mens, Scout als Organization), de klant als uitgever, en
+     * bijdragers en beoordelaar alleen als die er echt waren. Zonder
+     * provenance blijft het zoals het was.
+     *
+     * @return array{author: array, publisher: array, contributor: ?array, reviewer: ?array, og_author: string}
+     */
+    private function people(ContentStudioArticle $article, string $canonical): array
+    {
+        $provenance = $article->validProvenance();
+
+        if ($provenance === null) {
+            return [
+                'author' => self::authorNode($article->author_name, $article->author_role_title, (string) config('app.name')),
+                'publisher' => self::publisherNode((string) config('app.name'), config('content-studio.seo.publisher_logo')),
+                'contributor' => null,
+                'reviewer' => null,
+                'og_author' => filled($article->author_name) ? (string) $article->author_name : (string) config('app.name'),
+            ];
+        }
+
+        $pieces = ProvenanceSchema::pieces($provenance);
+        $publisher = $pieces['publisher'] !== []
+            ? $pieces['publisher']
+            : self::publisherNode((string) config('app.name'), config('content-studio.seo.publisher_logo'));
+
+        return [
+            'author' => ['@id' => $canonical.'#author'] + $pieces['author'],
+            'publisher' => $publisher,
+            'contributor' => $pieces['contributor'] !== [] ? $pieces['contributor'] : null,
+            'reviewer' => $pieces['reviewer'],
+            'og_author' => (string) ($article->byline()['name'] ?? $pieces['author']['name'] ?? ''),
+        ];
     }
 
     /**

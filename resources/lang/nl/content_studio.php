@@ -33,4 +33,7 @@ return [
     'publication' => 'Publicatie',
     'reading_time_label' => 'Leestijd',
     'reading_time_minutes' => ':minutes min',
+    'about_this_article' => 'Over dit artikel',
+    'compiled_by' => 'Samengesteld door',
+    'written_by' => 'Geschreven door',
 ];

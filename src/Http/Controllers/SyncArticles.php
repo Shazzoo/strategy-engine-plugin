@@ -14,6 +14,8 @@ use Shazzoo\StrategyEngine\Support\ArticleImagePlaceholders;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
 use Shazzoo\StrategyEngine\Support\Engine\ConfirmPublished;
 use Shazzoo\StrategyEngine\Support\Engine\ProjectInfo;
+use Shazzoo\StrategyEngine\Support\Provenance\Disclosure;
+use Shazzoo\StrategyEngine\Support\Publication\Publication;
 
 class SyncArticles
 {
@@ -152,7 +154,12 @@ class SyncArticles
             $article = $this->processArticle($item);
 
             if ($article) {
-                if (app()->environment('production')) {
+                /* Eerst kijken of het artikel er echt staat zoals de
+                   provenance zegt; pas dan bevestigen. Een tegengehouden of
+                   teruggedraaid artikel wordt niet als live gemeld. */
+                $result = Publication::finalize($article);
+
+                if (Publication::succeeded($result) && app()->environment('production')) {
                     app(ConfirmPublished::class)($article);
                 }
 
@@ -198,6 +205,12 @@ class SyncArticles
      *
      * Geeft het artikel terug, of null als het niet verwerkt kon worden;
      * het bevestigen is aan de aanroeper, omdat V1 en V2 dat anders doen.
+     *
+     * Wat de Engine levert, wordt gepubliceerd: die beslist wat live mag.
+     * Is de provenance ongeldig, dan komt het artikel er zonder blok "Over
+     * dit artikel" en hoort de Engine dat bij de terugmelding. Tekst en
+     * provenance worden in één transactie geschreven: lukt het opslaan niet,
+     * dan komt er ook niets live.
      */
     public function processArticle($item): ?ContentStudioArticle
     {
@@ -216,6 +229,8 @@ class SyncArticles
             return null;
         }
 
+        $prepared = Publication::prepare($item);
+
         DB::beginTransaction();
 
         try {
@@ -224,6 +239,17 @@ class SyncArticles
             $id = $item['id'] ?? null;
             $excerpt = $item['excerpt'] ?? null;
             $body_html = $item['body_html'] ?? null;
+            $existing = $id !== null ? ContentStudioArticle::query()
+                ->where('content_studio_article_id', $id)
+                ->where('locale', $this->normalizeLocale($item['locale'] ?? null))
+                ->first() : null;
+
+            if (is_string($body_html)) {
+                /* Een blok "Over dit artikel" in de tekst zelf hoort hier niet:
+                   de site zet het er native bij, uit de provenance. */
+                $body_html = Disclosure::strip($body_html);
+            }
+
             if (is_string($body_html)) {
                 $body_html = ArticleImagePlaceholders::replace(
                     $body_html,
@@ -247,11 +273,7 @@ class SyncArticles
             $twitter_title = $item['twitter_title'] ?? null;
             $twitter_description = $item['twitter_description'] ?? null;
             $slug = $item['slug'] ?? null;
-            $locale = str_replace('_', '-', strtolower(trim((string) ($item['locale'] ?? ''))));
-            if ($locale === '') {
-                $locale = config('app.locale', 'nl');
-            }
-            $locale = substr($locale, 0, 10);
+            $locale = $this->normalizeLocale($item['locale'] ?? null);
 
             if (! filled($slug)) {
                 $baseSlug = Str::slug((string) $title);
@@ -305,12 +327,12 @@ class SyncArticles
                 Storage::disk('public')->put($upload_path, file_get_contents($featured_image_url));
             }
 
-            $article = ContentStudioArticle::updateOrCreate(
-                [
-                    'content_studio_article_id' => $id,
-                    'locale' => $locale,
-                ],
-                [
+            $article = $existing ?? new ContentStudioArticle([
+                'content_studio_article_id' => $id,
+                'locale' => $locale,
+            ]);
+
+            $article->fill([
                     'locale' => $locale,
                     'title' => $title,
                     'excerpt' => $excerpt,
@@ -342,10 +364,22 @@ class SyncArticles
                     'author_experience_summary' => $author_experience_summary,
                     'author_article_relevance' => $author_article_relevance,
                     'author_boundary_note' => $author_boundary_note,
-                ]
-            );
+                ]);
+
+            Publication::record($article, $prepared);
+            $article->save();
 
             DB::commit();
+
+            if ($prepared['present'] && $prepared['provenance'] === null) {
+                Log::warning('[StrategyEngine] Gepubliceerd zonder verantwoording: de provenance is ongeldig.', [
+                    'id' => $id,
+                    'errors' => $prepared['errors'],
+                ]);
+            }
+
+            // Een site in body-modus krijgt het blok opnieuw, bij de nieuwe tekst.
+            Disclosure::syncBody($article);
 
             return $article;
         } catch (\Exception $e) {
@@ -357,6 +391,17 @@ class SyncArticles
 
             return null;
         }
+    }
+
+    private function normalizeLocale(mixed $value): string
+    {
+        $locale = str_replace('_', '-', strtolower(trim((string) $value)));
+
+        if ($locale === '') {
+            $locale = (string) config('app.locale', 'nl');
+        }
+
+        return substr($locale, 0, 10);
     }
 
     private function storePlaceholderImage(string $imageUrl, mixed $contentId, ?string $placeholderId, string $type = 'image'): string

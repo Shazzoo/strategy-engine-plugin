@@ -31,6 +31,38 @@ return [
      */
     'route_prefixes' => [],
 
+    /*
+     * Herkomst van artikelen ("Over dit artikel") en de controle na
+     * publicatie. Zie de README, "Over dit artikel".
+     */
+    'provenance' => [
+        // author, top of bottom. Leeg: wat de Engine voorstelt, anders onderaan.
+        'position' => env('CONTENT_STUDIO_PROVENANCE_POSITION'),
+
+        // native (de component) of body (altijd in de tekst). Leeg: native,
+        // met body alleen als de verificatie aantoont dat native niet werkt.
+        'rendering' => env('CONTENT_STUDIO_PROVENANCE_RENDERING'),
+
+        'allow_body_fallback' => true,
+
+        // Na publicatie de publieke pagina ophalen en controleren.
+        'verify' => env('CONTENT_STUDIO_VERIFY_PUBLICATION', true),
+
+        // Leeg: alleen in productie het certificaat controleren.
+        'verify_ssl' => env('CONTENT_STUDIO_VERIFY_SSL'),
+
+        // warn of block: wat een afwijkend Article-schema op de pagina betekent.
+        'schema_conflict_policy' => env('CONTENT_STUDIO_SCHEMA_CONFLICT_POLICY', 'warn'),
+
+        // Pogingen en pauzes (seconden) bij het ophalen.
+        'verifier' => [
+            'attempts' => 3,
+            'backoff' => [1, 3],
+        ],
+
+        'supported_versions' => [1],
+    ],
+
     'tracking' => [
         'enabled' => env('CONTENT_STUDIO_TRACKING_ENABLED', true),
         'endpoint' => env(

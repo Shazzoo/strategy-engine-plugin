@@ -14,11 +14,7 @@
     $readTime = $readTime ?? read_time($article->body_html);
     $image_url = $image_url ?? \Illuminate\Support\Facades\Storage::disk('public')->url($article->featured_image_url);
     $processedBody = $processedBody ?? $article->body_html;
-    $authors = collect(preg_split('/\s*[,;]\s*/', (string) $article->author_name, -1, PREG_SPLIT_NO_EMPTY))
-        ->map(fn($author) => trim($author))
-        ->filter()
-        ->values()
-        ->all();
+    $authors = $article->bylineNames();
 @endphp
 
 <div class="mx-auto mt-5 max-w-7xl">
@@ -36,7 +32,7 @@
                 </p>
 
                 <div class="pt-6">
-                    <x-strategy-engine::article-info :date="$date" :time="$readTime" :authors="$authors" />
+                    <x-strategy-engine::article-info :date="$date" :time="$readTime" :authors="$authors" :byline="$article->byline()" />
                 </div>
             </div>
 
@@ -66,22 +62,29 @@
                         </nav>
                     </div>
 
-                    <div class="rounded-lg border border-line bg-bg-alt p-6">
-                        <p class="mb-2 text-xs font-bold uppercase text-ink-400">
-                            {{ __('strategy-engine::content_studio.expert_review') }}</p>
-                        <p class="text-sm leading-relaxed text-ink-800">
-                            {{ __('strategy-engine::content_studio.updated_on_by_team', ['date' => $date]) }}
-                        </p>
-                    </div>
+                    {{-- Een beoordeling alleen noemen als een mens het artikel las. --}}
+                    @if ($article->mayClaimReview())
+                        <div class="rounded-lg border border-line bg-bg-alt p-6">
+                            <p class="mb-2 text-xs font-bold uppercase text-ink-400">
+                                {{ __('strategy-engine::content_studio.expert_review') }}</p>
+                            <p class="text-sm leading-relaxed text-ink-800">
+                                {{ __('strategy-engine::content_studio.updated_on_by_team', ['date' => $date]) }}
+                            </p>
+                        </div>
+                    @endif
                 </div>
             </aside>
 
             <section class="lg:w-3/4">
                 @include('strategy-engine::partials.article-styles')
 
+                <x-strategy-engine::provenance :article="$article" :at="['top']" />
+
                 <section class="article-body max-w-none">
                     {!! $processedBody !!}
                 </section>
+
+                <x-strategy-engine::provenance :article="$article" :at="['author', 'bottom']" />
 
                 <section id="verdieping" class="mt-24 border-t border-line pt-16">
                     <h2 class="mb-2 text-3xl font-black text-ink-950">

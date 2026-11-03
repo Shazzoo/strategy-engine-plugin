@@ -16,7 +16,7 @@
         <h1 class="mb-3 text-[clamp(34px,4.2vw,50px)] leading-[1.1] text-ink-950">
             {!! $article->title !!}
         </h1>
-        <x-strategy-engine::article-info :date="$date" :time="$readTime" :authors="[$article->author_name]" />
+        <x-strategy-engine::article-info :date="$date" :time="$readTime" :authors="$article->bylineNames()" :byline="$article->byline()" />
     </header>
 
     <div class="mb-10">
@@ -27,9 +27,13 @@
     <div>
         @include('strategy-engine::partials.article-styles')
 
+        <x-strategy-engine::provenance :article="$article" :at="['top']" />
+
         <div class="article-body max-w-none">
             {!! $article->body_html !!}
         </div>
+
+        <x-strategy-engine::provenance :article="$article" :at="['bottom']" />
 
         {{-- Currently hardcoded for testing, is not yet in API response --}}
         {{-- <x-strategy-engine::article-tags /> --}}
@@ -47,7 +51,9 @@
                 ->values();
         @endphp
 
-        @if ($authorName && ($authorIntro->isNotEmpty() || filled($article->author_boundary_note)))
+        {{-- Alleen voor een mens: bij Scout of een organisatie als auteur
+             zou dit een tweede, andere auteur onder het artikel zetten. --}}
+        @if ($authorName && $article->showsAuthorBio() && ($authorIntro->isNotEmpty() || filled($article->author_boundary_note)))
             <section class="mt-14 border-t border-line pt-8">
                 <p class="mb-4 text-xs font-bold uppercase tracking-[0.08em] text-ink-400">
                     {{ __('strategy-engine::content_studio.about_the_author') }}
@@ -72,6 +78,8 @@
                 @endif
             </section>
         @endif
+
+        <x-strategy-engine::provenance :article="$article" :at="['author']" />
 
         <section class="mt-14 grid grid-cols-1 gap-8 border-t border-line pt-8 md:grid-cols-2">
             <div>

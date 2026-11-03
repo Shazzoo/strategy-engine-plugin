@@ -16,9 +16,11 @@ use Shazzoo\StrategyEngine\Support\Engine\WebhookSignature;
  * site zelf op, met zijn eigen sleutel. Wie de webhook onderschept, weet
  * dus niets dat hij niet toch al kon opvragen.
  *
- * Het werk gebeurt hier meteen en niet via een queue. Dat is één ophaal,
- * één opslag en één terugmelding - ruim binnen een seconde - en het
- * scheelt deze site de aanname dat er een queue-worker draait.
+ * Ophalen en opslaan gebeuren hier meteen en niet via een queue: dat is
+ * één ophaal en één opslag, ruim binnen een seconde, en het scheelt deze
+ * site de aanname dat er een queue-worker draait. Verifiëren en
+ * terugmelden komen ná het antwoord (SyncFromEngine::deferred): de pagina
+ * ophalen met retries tegen een cache kan langer duren dan de engine wacht.
  */
 class EngineWebhookController
 {
@@ -48,7 +50,7 @@ class EngineWebhookController
         $event = (string) ($request->input('event') ?: $request->header('X-Content-Studio-Event'));
         $articleId = (int) $request->input('article_id');
 
-        $sync = SyncFromEngine::make();
+        $sync = SyncFromEngine::make()->deferred();
 
         match ($event) {
             'article.publish' => $sync->one($articleId, 'published'),

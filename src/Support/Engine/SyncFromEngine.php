@@ -4,7 +4,9 @@ namespace Shazzoo\StrategyEngine\Support\Engine;
 
 use Illuminate\Support\Facades\Log;
 use Shazzoo\StrategyEngine\Http\Controllers\SyncArticles;
+use Shazzoo\StrategyEngine\Models\ContentStudioArticle;
 use Shazzoo\StrategyEngine\Support\ArticleRoutes;
+use Shazzoo\StrategyEngine\Support\Publication\Publication;
 
 /**
  * De V2-kant: de engine zegt dat er iets klaarstaat, deze site haalt het
@@ -20,10 +22,29 @@ use Shazzoo\StrategyEngine\Support\ArticleRoutes;
  */
 final class SyncFromEngine
 {
+    /**
+     * Verifiëren en terugmelden na het antwoord aan de engine, in plaats van
+     * ervoor. De engine wacht maar kort op een webhook; de pagina ophalen,
+     * met retries tegen een cache, kan langer duren.
+     */
+    private bool $defer = false;
+
     public function __construct(
         private readonly EngineClient $engine,
         private readonly SyncArticles $articles,
     ) {}
+
+    /**
+     * Voor de webhook: stap 6 tot 9 (cache, ophalen, verifiëren, melden)
+     * gebeuren nadat het antwoord de deur uit is. Zonder queue-worker: in
+     * hetzelfde proces, via app()->terminating().
+     */
+    public function deferred(): self
+    {
+        $this->defer = true;
+
+        return $this;
+    }
 
     public static function make(): self
     {
@@ -65,14 +86,7 @@ final class SyncFromEngine
             return false;
         }
 
-        $this->engine->acknowledge(
-            $articleId,
-            $action,
-            externalRef: (string) $article->id,
-            url: $this->urlFor($article),
-        );
-
-        return true;
+        return $this->finish($article, $articleId, $action);
     }
 
     /**
@@ -123,12 +137,7 @@ final class SyncFromEngine
                     /* Nieuw hier, of een bestaand artikel bijgewerkt -
                        de engine hoort het verschil, want alleen bij een
                        eerste publicatie gebeurt daar nog iets mee. */
-                    $this->engine->acknowledge(
-                        (int) $item['id'],
-                        $article->wasRecentlyCreated ? 'published' : 'updated',
-                        externalRef: (string) $article->id,
-                        url: $this->urlFor($article),
-                    );
+                    $this->finish($article, (int) $item['id'], $article->wasRecentlyCreated ? 'published' : 'updated');
                 }
             }
 
@@ -152,12 +161,22 @@ final class SyncFromEngine
         return route('content-studio.webhook');
     }
 
-    private function urlFor($article): ?string
+    /**
+     * Stap 6 tot 9: cache, ophalen, verifiëren, melden.
+     */
+    private function finish(ContentStudioArticle $article, int $articleId, string $action): bool
     {
-        try {
-            return ArticleRoutes::articleUrl((string) $article->slug, (string) $article->locale);
-        } catch (\Throwable) {
-            return null;
+        $run = function () use ($article, $articleId, $action) {
+            ignore_user_abort(true);
+            Publication::report($article, $articleId, $action, Publication::finalize($article), $this->engine);
+        };
+
+        if ($this->defer) {
+            app()->terminating($run);
+        } else {
+            $run();
         }
+
+        return true;
     }
 }

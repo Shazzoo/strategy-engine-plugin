@@ -1,4 +1,7 @@
 <?php
 
-// De placeholderklasse is puur statisch en raakt Laravel niet aan, dus de
-// tests draaien zonder applicatie-bootstrap.
+use Shazzoo\StrategyEngine\Tests\TestCase;
+
+// De unit-tests raken Laravel niet aan en draaien zonder applicatie. De
+// feature-tests draaien in een Testbench-app met de plugin geladen.
+uses(TestCase::class)->in('Feature');
