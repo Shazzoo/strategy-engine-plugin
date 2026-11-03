@@ -225,10 +225,22 @@ puts a CDN or proxy cache in front, listen for
 php artisan content-studio:provenance status    {id|engine:<id>}
 php artisan content-studio:provenance verify    {id|engine:<id>}   # check the live page now and report
 php artisan content-studio:provenance dedupe    {id|engine:<id>}   # remove duplicate blocks, then verify
-php artisan content-studio:provenance republish {id|engine:<id>}   # fetch from the Engine again and publish
+php artisan content-studio:provenance republish {id|engine:<id>}   # fetch from the Engine again and publish; engine:<id> also works for an article this site never stored
 ```
 
 Add `--no-report` to keep the Engine out of it.
+
+**Articles that could not be saved.** The sync cursor moves on after every
+page, even if an article on it failed to save. Such an article goes on a
+retry list (`cs_sync_retries` on `content_studio_settings`), and every
+`content-studio:articles` run fetches it again first. After 10 failures
+the plugin gives up and logs an error with the `republish` command to use.
+If the Engine no longer returns the article, it leaves the list.
+
+**After updating the plugin, run `php artisan migrate`.** Without the new
+columns, articles still arrive, but without the *About this article* block
+and without verification. The log says so, and the Engine gets
+`provenance_migration_pending`.
 
 ## Privacy
 

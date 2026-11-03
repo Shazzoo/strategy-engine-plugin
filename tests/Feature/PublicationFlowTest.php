@@ -370,3 +370,58 @@ test('an article that never arrived can be fetched by its engine id', function (
         ->and(ContentStudioArticle::where('content_studio_article_id', 2333)->exists())->toBeTrue()
         ->and($this->acknowledgements()[0]['action'])->toBe('published');
 });
+
+test('an article that could not be saved is tried again in the next round', function () {
+    $this->serveSite();
+    $this->engineChanges = ['data' => [
+        $this->article($this->provenance('scout', complete())),
+        $this->article($this->provenance('scout', complete()), ['id' => 4712, 'slug' => 'tweede']),
+    ], 'next_cursor' => 'c2', 'has_more' => false];
+
+    // Het eerste artikel faalt bij het opslaan, zoals op een site zonder kolommen.
+    $broken = true;
+    ContentStudioArticle::saving(function ($article) use (&$broken) {
+        if ($broken && (int) $article->content_studio_article_id === 4711) {
+            throw new RuntimeException('kolom ontbreekt');
+        }
+    });
+
+    SyncFromEngine::make()->catchUp();
+
+    expect(ContentStudioArticle::pluck('content_studio_article_id')->all())->toBe([4712])
+        ->and(\Shazzoo\StrategyEngine\Support\Engine\EngineClient::fromSettings()->retries())->toBe([4711 => 1])
+        ->and(collect($this->acknowledgements())->firstWhere('article_id', 4711)['action'])->toBe('failed');
+
+    // De volgende ronde: de cursor is voorbij, maar het artikel komt toch.
+    $broken = false;
+    $this->serveSite(null, $this->article($this->provenance('scout', complete())));
+    $this->engineChanges = ['data' => [], 'next_cursor' => 'c2', 'has_more' => false];
+
+    expect(SyncFromEngine::make()->catchUp())->toBe(1)
+        ->and(ContentStudioArticle::where('content_studio_article_id', 4711)->exists())->toBeTrue()
+        ->and(\Shazzoo\StrategyEngine\Support\Engine\EngineClient::fromSettings()->retries())->toBe([])
+        ->and(collect($this->acknowledgements())->firstWhere('article_id', 4711)['action'])->toBe('published');
+});
+
+test('after ten failures an article is given up and logged', function () {
+    $this->serveSite(null, $this->article($this->provenance('scout', complete())));
+    ContentStudioArticle::saving(fn () => throw new RuntimeException('blijft stuk'));
+    \Illuminate\Support\Facades\Log::spy();
+
+    for ($i = 0; $i < SyncFromEngine::MAX_RETRIES; $i++) {
+        SyncFromEngine::make()->one(4711);
+    }
+
+    expect(\Shazzoo\StrategyEngine\Support\Engine\EngineClient::fromSettings()->retries())->toBe([]);
+    \Illuminate\Support\Facades\Log::shouldHaveReceived('error')->withArgs(fn ($message) => str_contains($message, 'opgegeven'))->once();
+});
+
+test('an article the engine no longer gives is dropped from the retries', function () {
+    $client = \Shazzoo\StrategyEngine\Support\Engine\EngineClient::fromSettings();
+    $client->rememberFailure(4711);
+
+    $this->serveSite(null, null);
+    SyncFromEngine::make()->retryFailed();
+
+    expect(\Shazzoo\StrategyEngine\Support\Engine\EngineClient::fromSettings()->retries())->toBe([]);
+});

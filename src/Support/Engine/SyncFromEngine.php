@@ -29,6 +29,9 @@ final class SyncFromEngine
      */
     private bool $defer = false;
 
+    /** Na zoveel mislukte pogingen geeft de site een artikel op. */
+    public const MAX_RETRIES = 10;
+
     public function __construct(
         private readonly EngineClient $engine,
         private readonly SyncArticles $articles,
@@ -63,17 +66,35 @@ final class SyncFromEngine
         if (! $item) {
             /* Hier niet melden als fout: de engine kan het artikel met
                opzet nog niet geven - het publicatiemoment kan net nog niet
-               bereikt zijn - en dan is er niets mis. */
+               bereikt zijn - en dan is er niets mis. Komt het later wel,
+               dan meldt de engine het opnieuw; hier hoeft niets te blijven
+               wachten. */
             Log::info('[StrategyEngine] Engine gaf dit artikel (nog) niet.', ['article_id' => $articleId]);
+            $this->engine->forgetFailure($articleId);
 
             return false;
         }
+
+        $item['id'] ??= $articleId;
+
+        return $this->handle($item, $action);
+    }
+
+    /**
+     * Eén artikel uit de engine verwerken. Lukt het opslaan niet, dan komt
+     * het op de lijst om het later opnieuw te proberen: de cursor schuift
+     * hoe dan ook door, en zonder die lijst kwam het nooit meer langs.
+     */
+    private function handle(array $item, string $action): bool
+    {
+        $articleId = (int) $item['id'];
 
         if (! ArticleRoutes::publishesLocale($item['locale'] ?? null)) {
             /* Geen fout: de Engine schrijft in de talen van het project en
                deze site toont er minder. Overgeslagen is iets anders dan
                mislukt, en de Engine hoort het verschil te weten. */
             $this->engine->acknowledge($articleId, 'skipped');
+            $this->engine->forgetFailure($articleId);
 
             return false;
         }
@@ -81,12 +102,44 @@ final class SyncFromEngine
         $article = $this->articles->processArticle($item);
 
         if (! $article) {
+            $attempts = $this->engine->rememberFailure($articleId);
+
+            if ($attempts >= self::MAX_RETRIES) {
+                $this->engine->forgetFailure($articleId);
+                Log::error('[StrategyEngine] Artikel na '.self::MAX_RETRIES.' pogingen opgegeven; haal het op met content-studio:provenance republish engine:'.$articleId.'.', [
+                    'article_id' => $articleId,
+                ]);
+            }
+
             $this->engine->acknowledge($articleId, 'failed', error: 'De site kon het artikel niet verwerken.');
 
             return false;
         }
 
+        $this->engine->forgetFailure($articleId);
+
         return $this->finish($article, $articleId, $action);
+    }
+
+    /**
+     * Wat eerder niet opgeslagen kon worden, nog eens. Per artikel opnieuw
+     * opgehaald: de engine kan het inmiddels gewijzigd of ingetrokken hebben.
+     *
+     * @return int Hoeveel er nu wel lukten.
+     */
+    public function retryFailed(): int
+    {
+        $handled = 0;
+
+        foreach (array_keys($this->engine->retries()) as $articleId) {
+            $known = ContentStudioArticle::query()->where('content_studio_article_id', $articleId)->exists();
+
+            if ($this->one($articleId, $known ? 'updated' : 'published')) {
+                $handled++;
+            }
+        }
+
+        return $handled;
     }
 
     /**
@@ -97,7 +150,7 @@ final class SyncFromEngine
     public function catchUp(int $maxPages = 20): int
     {
         $cursor = $this->engine->cursor();
-        $handled = 0;
+        $handled = $this->retryFailed();
 
         for ($page = 0; $page < $maxPages; $page++) {
             $changes = $this->engine->changes($cursor);
@@ -121,23 +174,17 @@ final class SyncFromEngine
             }
 
             foreach ($changes['data'] as $item) {
-                if (! ArticleRoutes::publishesLocale($item['locale'] ?? null)) {
-                    /* Terugmelden, anders komt hij elke ronde opnieuw
-                       voorbij als iets wat nog afgehandeld moet worden. */
-                    $this->engine->acknowledge((int) $item['id'], 'skipped');
-
+                if (empty($item['id'])) {
                     continue;
                 }
 
-                $article = $this->articles->processArticle($item);
+                /* Nieuw hier, of een bestaand artikel bijgewerkt - de
+                   engine hoort het verschil, want alleen bij een eerste
+                   publicatie gebeurt daar nog iets mee. */
+                $known = ContentStudioArticle::query()->where('content_studio_article_id', $item['id'])->exists();
 
-                if ($article) {
+                if ($this->handle($item, $known ? 'updated' : 'published')) {
                     $handled++;
-
-                    /* Nieuw hier, of een bestaand artikel bijgewerkt -
-                       de engine hoort het verschil, want alleen bij een
-                       eerste publicatie gebeurt daar nog iets mee. */
-                    $this->finish($article, (int) $item['id'], $article->wasRecentlyCreated ? 'published' : 'updated');
                 }
             }
 

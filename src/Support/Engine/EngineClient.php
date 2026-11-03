@@ -61,6 +61,83 @@ final class EngineClient
         }
     }
 
+    /**
+     * Artikelen die hier niet opgeslagen konden worden: engine-id => aantal
+     * mislukte pogingen. Leeg op een site die de migratie nog niet draaide.
+     *
+     * @return array<int, int>
+     */
+    public function retries(): array
+    {
+        if (! self::canRememberRetries()) {
+            return [];
+        }
+
+        $value = $this->setting->cs_sync_retries;
+        $retries = is_array($value) ? $value : (array) json_decode((string) $value, true);
+
+        $clean = [];
+
+        foreach ($retries as $id => $attempts) {
+            if ((int) $id > 0) {
+                $clean[(int) $id] = (int) $attempts;
+            }
+        }
+
+        return $clean;
+    }
+
+    /** Nog een mislukte poging voor dit artikel. Geeft het nieuwe aantal. */
+    public function rememberFailure(int $articleId): int
+    {
+        $retries = $this->retries();
+        $retries[$articleId] = ($retries[$articleId] ?? 0) + 1;
+        $this->storeRetries($retries);
+
+        return $retries[$articleId];
+    }
+
+    public function forgetFailure(int $articleId): void
+    {
+        $retries = $this->retries();
+
+        if (array_key_exists($articleId, $retries)) {
+            unset($retries[$articleId]);
+            $this->storeRetries($retries);
+        }
+    }
+
+    /** @param  array<int, int>  $retries */
+    private function storeRetries(array $retries): void
+    {
+        if (! self::canRememberRetries()) {
+            return;
+        }
+
+        $this->setting->forceFill(['cs_sync_retries' => $retries === [] ? null : json_encode($retries)])->save();
+    }
+
+    private static ?bool $retriesColumn = null;
+
+    private static function canRememberRetries(): bool
+    {
+        if (self::$retriesColumn === null) {
+            try {
+                self::$retriesColumn = \Illuminate\Support\Facades\Schema::hasColumn('content_studio_settings', 'cs_sync_retries');
+            } catch (\Throwable) {
+                self::$retriesColumn = false;
+            }
+        }
+
+        return self::$retriesColumn;
+    }
+
+    /** @internal Voor tests. */
+    public static function forgetSchema(): void
+    {
+        self::$retriesColumn = null;
+    }
+
     public function lastStatus(): ?int
     {
         return $this->lastStatus;

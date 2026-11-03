@@ -20,6 +20,7 @@ class ContentStudioSetting extends Model
         'cs_project_code',
         'cs_webhook_secret',
         'cs_sync_cursor',
+        'cs_sync_retries',
         'route_prefix',
         'articles_per_block',
         'articles_per_page',
