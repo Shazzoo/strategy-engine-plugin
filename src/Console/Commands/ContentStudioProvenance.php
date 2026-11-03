@@ -14,7 +14,8 @@ use Shazzoo\StrategyEngine\Support\Publication\Publication;
  *
  *   status    wat er is vastgelegd en wat de laatste verificatie zag
  *   verify    de publieke pagina nu opnieuw controleren (en melden)
- *   republish het artikel opnieuw bij de engine ophalen en publiceren
+ *   republish het artikel opnieuw bij de engine ophalen en publiceren; met
+ *             engine:<id> ook als het hier nog niet staat
  *   dedupe    dubbele blokken uit de tekst halen en opnieuw controleren
  *   due       herhaalpogingen na een tijdelijke waarschuwing (scheduler)
  */
@@ -38,6 +39,12 @@ class ContentStudioProvenance extends Command
         }
 
         $article = $this->article();
+
+        if (! $article && $action === 'republish' && str_starts_with((string) $this->argument('article'), 'engine:')) {
+            /* Nog niet hier: een artikel dat bij een eerdere ronde niet
+               opgeslagen kon worden. Gewoon ophalen. */
+            return $this->fetch((int) substr((string) $this->argument('article'), 7));
+        }
 
         if (! $article) {
             $this->error('Artikel niet gevonden.');
@@ -84,6 +91,11 @@ class ContentStudioProvenance extends Command
 
     private function republish(ContentStudioArticle $article): int
     {
+        return $this->fetch((int) $article->content_studio_article_id);
+    }
+
+    private function fetch(int $engineArticleId): int
+    {
         $engine = EngineClient::fromSettings();
 
         if (! $engine->isConnected()) {
@@ -93,7 +105,8 @@ class ContentStudioProvenance extends Command
         }
 
         $sync = new SyncFromEngine($engine, app(\Shazzoo\StrategyEngine\Http\Controllers\SyncArticles::class));
-        $ok = $sync->one((int) $article->content_studio_article_id, 'updated');
+        $known = ContentStudioArticle::query()->where('content_studio_article_id', $engineArticleId)->exists();
+        $ok = $sync->one($engineArticleId, $known ? 'updated' : 'published');
 
         $this->line($ok ? 'Opnieuw gepubliceerd.' : 'Niet gelukt; zie status en het log.');
 

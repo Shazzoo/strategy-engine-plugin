@@ -361,3 +361,12 @@ test('a site that updated without migrating keeps receiving articles', function 
     expect($article->provenance_state)->toBe(ContentStudioArticle::STATE_VALID)
         ->and(Disclosure::count($this->page()))->toBe(1);
 });
+
+test('an article that never arrived can be fetched by its engine id', function () {
+    $this->serveSite(null, $this->article($this->provenance('scout', complete()), ['id' => 2333]));
+
+    expect(ContentStudioArticle::count())->toBe(0)
+        ->and(Artisan::call('content-studio:provenance', ['action' => 'republish', 'article' => 'engine:2333']))->toBe(0)
+        ->and(ContentStudioArticle::where('content_studio_article_id', 2333)->exists())->toBeTrue()
+        ->and($this->acknowledgements()[0]['action'])->toBe('published');
+});
